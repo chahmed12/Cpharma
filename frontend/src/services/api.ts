@@ -1,49 +1,40 @@
 import axios from 'axios';
 
-// ─── Instance principale ──────────────────────────────
+const getBaseUrl = () => {
+    if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+    // Fallback intelligent
+    return `${window.location.protocol}//${window.location.hostname}:8000/api`;
+};
+
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:8000/api',
+    baseURL: getBaseUrl(),
     headers: { 'Content-Type': 'application/json' },
-    timeout: 10000,
 });
 
-// ─── Intercepteur REQUÊTE : injecte le JWT ─────────────
-api.interceptors.request.use(
-    (config) => {
-        const token = localStorage.getItem('access_token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
-    (error) => Promise.reject(error)
-);
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    return config;
+});
 
-// ─── Intercepteur RÉPONSE : refresh automatique ────────
 api.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-        const original = error.config;
-
-        // Token expiré → tentative de refresh
-        if (error.response?.status === 401 && !original._retry) {
+    (res) => res,
+    async (err) => {
+        const original = err.config;
+        if (err.response?.status === 401 && !original._retry) {
             original._retry = true;
             try {
                 const refresh = localStorage.getItem('refresh_token');
-                const { data } = await axios.post(
-                    `${import.meta.env.VITE_API_URL}/auth/token/refresh/`,
-                    { refresh }
-                );
+                const { data } = await axios.post(`${getBaseUrl()}/auth/token/refresh/`, { refresh });
                 localStorage.setItem('access_token', data.access);
                 original.headers.Authorization = `Bearer ${data.access}`;
-                return api(original);  // relance la requête initiale
+                return api(original);
             } catch {
-                // Refresh échoué → déconnexion forcée
                 localStorage.clear();
                 window.location.href = '/login';
             }
         }
-        return Promise.reject(error);
+        return Promise.reject(err);
     }
 );
 

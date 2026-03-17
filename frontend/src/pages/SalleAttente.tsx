@@ -1,22 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 
 export default function SalleAttente() {
     const navigate = useNavigate();
-    const location = useLocation();
+    const { id } = useParams<{ id: string }>();
+    const consultationId = id ? Number(id) : null;
     const [dots, setDots] = useState('');
-
-    // 1. On autorise undefined pour éviter les erreurs TypeScript
-    const consultationId: number | undefined = location.state?.consultationId;
-
-    // Redirection de sécurité si l'utilisateur rafraîchit la page 
-    // (car location.state sera perdu)
-    useEffect(() => {
-        if (!consultationId) {
-            navigate('/pharmacist/dashboard'); // Redirige où tu veux
-        }
-    }, [consultationId, navigate]);
 
     // Animation des points d'attente
     useEffect(() => {
@@ -29,25 +19,35 @@ export default function SalleAttente() {
     // Écoute l'acceptation via WebSocket
     useSocket('consultation_accepted', (data) => {
         const payload = data as { consultation_id: number };
+        // On vérifie que c'est bien notre consultation qui est acceptée
         if (payload.consultation_id === consultationId) {
             navigate(`/pharmacist/video/${consultationId}`);
         }
     });
 
-    // Si pas d'ID, on ne rend rien (le temps que le useEffect redirige)
-    if (!consultationId) return null;
+    if (!consultationId) {
+        return <div className="p-8 text-center">ID de consultation invalide</div>;
+    }
 
     return (
         <div style={{
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            height: '100vh', gap: '24px'
+            height: '100vh', gap: '24px', textAlign: 'center'
         }}>
-            <h2>En attente du médecin{dots}</h2>
-            <p style={{ opacity: 0.5 }}>
-                {/* 2. Simple accolade ici ! */}
-                Consultation #{consultationId} — Le médecin va accepter votre demande
+            <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '24px' }}>
+                En attente du médecin{dots}
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+                Consultation #{consultationId} — Le médecin a été notifié et va rejoindre l'appel.
             </p>
+            <button 
+                className="btn btn-secondary btn-sm"
+                onClick={() => navigate('/pharmacist/dashboard')}
+            >
+                Annuler et retourner au tableau de bord
+            </button>
         </div>
     );
 }

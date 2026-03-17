@@ -1,0 +1,61 @@
+services:
+  # ─── BASE DE DONNÉES ─────────────────────────────
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=pharma_db
+      - POSTGRES_USER=pharma_user
+      - POSTGRES_PASSWORD=zenvour
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pharma_user -d pharma_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── REDIS (WebSockets) ──────────────────────────
+  redis:
+    image: redis:7-alpine
+
+  # ─── BACKEND (Django + Daphne) ───────────────────
+  backend:
+    build: ./backend
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=prod-secret-key-cpharma
+      - POSTGRES_DB=pharma_db
+      - POSTGRES_USER=pharma_user
+      - POSTGRES_PASSWORD=zenvour
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - REDIS_HOST=redis
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # ─── FRONTEND (React + Nginx) ────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - VITE_API_URL=/api
+        - VITE_WS_URL=ws://localhost:80/ws
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:

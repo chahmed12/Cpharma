@@ -1,8 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { getConsultation } from '../services/consultationService';
+import type { Patient } from '../services/patientService';
 import { useAuth } from '../hooks/useAuth';
+import { Navbar } from '../components/ui/Navbar';
+import { Spinner } from '../components/ui/Spinner';
 
 export interface Medicament {
+    id: string;
     nom: string;
     posologie: string;
     duree: string;
@@ -10,87 +15,141 @@ export interface Medicament {
 
 export interface OrdonnanceData {
     consultation_id: number;
-    medecin_nom: string;
-    patient_nom: string;
+    patient: {
+        nom: string;
+        prenom?: string;
+        date_naissance?: string;
+        motif?: string;
+    };
     medicaments: Medicament[];
     instructions: string;
+    medecin_nom: string;
     date: string;
 }
 
-const emptyMed = (): Medicament =>
-    ({ nom: '', posologie: '', duree: '' });
+const newMed = (): Medicament => ({
+    id: crypto.randomUUID(),
+    nom: '',
+    posologie: '',
+    duree: '',
+});
 
 export default function PrescriptionForm() {
     const { id } = useParams<{ id: string }>();
-    const { user } = useAuth();
     const navigate = useNavigate();
-
-    const [medicaments, setMedicaments] = useState<Medicament[]>([emptyMed()]);
+    const { user } = useAuth();
+    const [patient, setPatient] = useState<Patient | null>(null);
+    const [meds, setMeds] = useState<Medicament[]>([newMed()]);
     const [instructions, setInstructions] = useState('');
-    const [patientNom, setPatientNom] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
-    const updateMed = (i: number, field: keyof Medicament, val: string) => {
-        setMedicaments(prev => prev.map((m, idx) =>
-            idx === i ? { ...m, [field]: val } : m
-        ));
+    useEffect(() => {
+        if (id) {
+            getConsultation(Number(id))
+                .then(c => {
+                    // On utilise patient_details qui vient du backend
+                    setPatient(c.patient_details);
+                })
+                .catch(err => {
+                    console.error("Erreur chargement consultation:", err);
+                    setError("Impossible de charger les données.");
+                })
+                .finally(() => setLoading(false));
+        }
+    }, [id]);
+
+    const updateMed = (medId: string, field: keyof Medicament, val: string) =>
+        setMeds(prev => prev.map(m => m.id === medId ? { ...m, [field]: val } : m));
+
+    const removeMed = (medId: string) =>
+        setMeds(prev => prev.filter(m => m.id !== medId));
+
+    const handleNext = () => {
+        const filled = meds.filter(m => m.nom.trim());
+        if (filled.length === 0) {
+            setError('Ajoutez au moins un médicament.');
+            return;
+        }
+        if (!patient) return;
+
+        navigate(`/doctor/sign/${id}`, {
+            state: {
+                consultation_id: Number(id),
+                patient: {
+                    nom: patient.nom,
+                    prenom: patient.prenom,
+                    date_naissance: patient.date_naissance,
+                },
+                medicaments: filled,
+                instructions,
+                medecin_nom: `Dr. ${user?.prenom} ${user?.nom}`,
+                date: new Date().toISOString(),
+            },
+        });
     };
 
-    const handleSubmit = () => {
-        const ordonnance: OrdonnanceData = {
-            consultation_id: Number(id),
-            medecin_nom: `${user?.prenom} ${user?.nom}`,
-            patient_nom: patientNom,
-            medicaments: medicaments.filter(m => m.nom.trim()),
-            instructions,
-            date: new Date().toISOString(),
-        };
-        // Passe les données à SignatureOrdonnance via state
-        navigate(`/doctor/sign/${id}`, { state: { ordonnance } });
-    };
+    if (loading) return <Spinner center dark size="lg" label="Chargement..." />;
 
     return (
-        <div className="max-w-2xl mx-auto p-6">
-            <h1 className="text-2xl font-bold mb-6">Rédiger l'ordonnance</h1>
-
-            <input
-                placeholder="Nom du patient"
-                value={patientNom}
-                onChange={e => setPatientNom(e.target.value)}
-                className="w-full border rounded p-2 mb-4"
-            />
-
-            {medicaments.map((m, i) => (
-                <div key={i} className="grid grid-cols-3 gap-2 mb-2">
-                    <input placeholder="Médicament" value={m.nom}
-                        onChange={e => updateMed(i, 'nom', e.target.value)}
-                        className="border rounded p-2" />
-                    <input placeholder="Posologie" value={m.posologie}
-                        onChange={e => updateMed(i, 'posologie', e.target.value)}
-                        className="border rounded p-2" />
-                    <input placeholder="Durée" value={m.duree}
-                        onChange={e => updateMed(i, 'duree', e.target.value)}
-                        className="border rounded p-2" />
+        <div className="page-wrapper">
+            <Navbar />
+            <div className="page-content-narrow">
+                <div className="animate-fade-up" style={{ marginBottom: '24px' }}>
+                    <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '24px', marginBottom: '4px' }}>Rédiger l'ordonnance</h1>
                 </div>
-            ))}
 
-            <button onClick={() => setMedicaments(p => [...p, emptyMed()])}
-                className="text-blue-600 text-sm mb-4 block">
-                + Ajouter un médicament
-            </button>
+                {patient && (
+                    <div style={{ background: 'var(--blue-50)', border: '1px solid var(--blue-100)', borderRadius: 'var(--radius-md)', padding: '14px 18px', marginBottom: '24px' }}>
+                        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                            <div>
+                                <p style={{ fontSize: '11px', color: 'var(--blue-600)', fontWeight: '700', textTransform: 'uppercase' }}>Patient</p>
+                                <p style={{ fontWeight: '700', color: 'var(--blue-800)' }}>{patient.prenom} {patient.nom}</p>
+                            </div>
+                            <div>
+                                <p style={{ fontSize: '11px', color: 'var(--blue-600)', fontWeight: '700', textTransform: 'uppercase' }}>Âge</p>
+                                <p style={{ fontWeight: '600', color: 'var(--blue-800)' }}>
+                                    {new Date().getFullYear() - new Date(patient.date_naissance).getFullYear()} ans
+                                </p>
+                            </div>
+                        </div>
+                        {patient.medical_record && (patient.medical_record.allergies || patient.medical_record.antecedents) && (
+                            <div style={{ borderTop: '1px solid var(--blue-200)', paddingTop: '10px', marginTop: '10px' }}>
+                                {patient.medical_record.allergies && <p style={{ fontSize: '13px', color: 'var(--red-600)' }}>⚠️ <strong>Allergies :</strong> {patient.medical_record.allergies}</p>}
+                                {patient.medical_record.antecedents && <p style={{ fontSize: '13px', color: 'var(--blue-800)' }}>📋 <strong>Antécédents :</strong> {patient.medical_record.antecedents}</p>}
+                            </div>
+                        )}
+                    </div>
+                )}
 
-            <textarea
-                placeholder="Instructions supplémentaires..."
-                value={instructions}
-                onChange={e => setInstructions(e.target.value)}
-                className="w-full border rounded p-2 mb-4 h-24"
-            />
+                <div style={{ marginBottom: '24px' }}>
+                    <p className="section-title">Médicaments prescrits</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {meds.map((m, i) => (
+                            <div key={m.id} className="card animate-fade-up" style={{ padding: '16px 18px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>Médicament n°{i + 1}</span>
+                                    {meds.length > 1 && <button onClick={() => removeMed(m.id)} className="btn btn-secondary btn-sm" style={{ color: 'var(--red-600)' }}>Supprimer</button>}
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '10px' }}>
+                                    <input className="input" placeholder="Nom" value={m.nom} onChange={e => updateMed(m.id, 'nom', e.target.value)} />
+                                    <input className="input" placeholder="Posologie" value={m.posologie} onChange={e => updateMed(m.id, 'posologie', e.target.value)} />
+                                    <input className="input" placeholder="Durée" value={m.duree} onChange={e => updateMed(m.id, 'duree', e.target.value)} />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <button className="btn btn-secondary btn-full" onClick={() => setMeds(p => [...p, newMed()])} style={{ marginTop: '10px' }}>＋ Ajouter un médicament</button>
+                </div>
 
-            <button
-                onClick={handleSubmit}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700"
-            >
-                Aperçu et Signature →
-            </button>
+                <div className="form-group" style={{ marginBottom: '24px' }}>
+                    <label className="label">Instructions complémentaires</label>
+                    <textarea className="input" rows={3} placeholder="Ex : Prendre avec de la nourriture..." value={instructions} onChange={e => setInstructions(e.target.value)} />
+                </div>
+
+                {error && <div className="alert alert-error" style={{ marginBottom: '16px' }}>{error}</div>}
+                <button className="btn btn-primary btn-full btn-lg" onClick={handleNext}>Prévisualiser l'ordonnance →</button>
+            </div>
         </div>
     );
 }

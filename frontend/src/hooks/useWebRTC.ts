@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, useCallback, useContext } from 'react';
-import { SocketContext } from '../context/SocketContext';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useAuth } from './useAuth';
 
 interface UseWebRTCOptions {
     consultationId: number;
-    isCaller: boolean;  // true = pharmacien, false = médecin
+    isCaller: boolean;
 }
 
 const ICE_SERVERS = {
@@ -14,138 +14,97 @@ const ICE_SERVERS = {
 };
 
 export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
-    const { send, on, off } = useContext(SocketContext);
+    const { token } = useAuth();
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
+    const wsRef = useRef<WebSocket | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
-    const iceCandidateQueue = useRef<RTCIceCandidateInit[]>([]);
+    
     const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>('new');
     const [isMicOn, setIsMicOn] = useState(true);
     const [isCamOn, setIsCamOn] = useState(true);
 
-    // ── Helpers signaling ────────────────────────────────
-    const sendSignal = useCallback(
-        (type: string, data: unknown) =>
-            send('webrtc_signal', { consultation_id: consultationId, type, data }),
-        [send, consultationId]
-    );
-
-    // ── Initialisation principale ────────────────────────
     useEffect(() => {
-        let cancelled = false;
+        if (!token || !consultationId) return;
 
-        async function init() {
-            // 1. Capture caméra + micro
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: true, audio: true
-            });
-            if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
+        const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
+        const ws = new WebSocket(`${WS_BASE}/webrtc/${consultationId}/?token=${token}`);
+        wsRef.current = ws;
 
+        const pc = new RTCPeerConnection(ICE_SERVERS);
+        pcRef.current = pc;
+
+        // 1. Médias
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
             localStreamRef.current = stream;
-            if (localVideoRef.current)
-                localVideoRef.current.srcObject = stream;
-
-            // 2. Créer RTCPeerConnection
-            const pc = new RTCPeerConnection(ICE_SERVERS);
-            pcRef.current = pc;
-
-            // Ajouter les pistes locales au peer
+            if (localVideoRef.current) localVideoRef.current.srcObject = stream;
             stream.getTracks().forEach(track => pc.addTrack(track, stream));
+        });
 
-            // Réception du flux distant
-            pc.ontrack = ({ streams }) => {
-                if (remoteVideoRef.current)
-                    remoteVideoRef.current.srcObject = streams[0];
-            };
+        pc.ontrack = (event) => {
+            if (remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
+        };
 
-            // Envoi des candidats ICE au pair via WebSocket
-            pc.onicecandidate = ({ candidate }) => {
-                if (candidate) sendSignal('ice', candidate.toJSON());
-            };
+        pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                ws.send(JSON.stringify({ type: 'ice', data: event.candidate }));
+            }
+        };
 
-            pc.onconnectionstatechange = () =>
-                setConnectionState(pc.connectionState);
+        pc.onconnectionstatechange = () => setConnectionState(pc.connectionState);
 
-            // 3. Si caller (pharmacien) → créer l'Offer
+        ws.onmessage = async (event) => {
+            const { type, data } = JSON.parse(event.data);
+            if (type === 'offer') {
+                await pc.setRemoteDescription(new RTCSessionDescription(data));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                ws.send(JSON.stringify({ type: 'answer', data: answer }));
+            } else if (type === 'answer') {
+                await pc.setRemoteDescription(new RTCSessionDescription(data));
+            } else if (type === 'ice') {
+                await pc.addIceCandidate(new RTCIceCandidate(data));
+            } else if (type === 'hangup') {
+                pc.close();
+                setConnectionState('disconnected');
+            }
+        };
+
+        ws.onopen = async () => {
             if (isCaller) {
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
-                sendSignal('offer', offer);
-            }
-        }
-
-        init().catch(console.error);
-
-        // ── Handlers signaling entrant ───────────────────────
-        const handleSignal = async (raw: unknown) => {
-            const { type, data } = raw as { type: string; data: unknown };
-            const pc = pcRef.current;
-            if (!pc) return;
-
-            if (type === 'offer') {
-                await pc.setRemoteDescription(new RTCSessionDescription(
-                    data as RTCSessionDescriptionInit
-                ));
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                sendSignal('answer', answer);
-                // Vider la file des ICE en attente
-                for (const c of iceCandidateQueue.current)
-                    await pc.addIceCandidate(new RTCIceCandidate(c));
-                iceCandidateQueue.current = [];
-            }
-
-            if (type === 'answer') {
-                await pc.setRemoteDescription(new RTCSessionDescription(
-                    data as RTCSessionDescriptionInit
-                ));
-            }
-
-            if (type === 'ice') {
-                const candidate = data as RTCIceCandidateInit;
-                if (pc.remoteDescription)
-                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                else
-                    iceCandidateQueue.current.push(candidate);
+                ws.send(JSON.stringify({ type: 'offer', data: offer }));
             }
         };
-
-        on('webrtc_signal', handleSignal);
 
         return () => {
-            cancelled = true;
-            off('webrtc_signal', handleSignal);
+            ws.close();
+            pc.close();
             localStreamRef.current?.getTracks().forEach(t => t.stop());
-            pcRef.current?.close();
         };
-    }, [consultationId, isCaller, sendSignal, on, off]);
+    }, [consultationId, isCaller, token]);
 
-    // ── Contrôles micro / caméra ─────────────────────────
     const toggleMic = useCallback(() => {
-        localStreamRef.current?.getAudioTracks().forEach(t => {
-            t.enabled = !t.enabled;
-        });
-        setIsMicOn(v => !v);
+        localStreamRef.current?.getAudioTracks().forEach(t => t.enabled = !t.enabled);
+        setIsMicOn(prev => !prev);
     }, []);
 
     const toggleCam = useCallback(() => {
-        localStreamRef.current?.getVideoTracks().forEach(t => {
-            t.enabled = !t.enabled;
-        });
-        setIsCamOn(v => !v);
+        localStreamRef.current?.getVideoTracks().forEach(t => t.enabled = !t.enabled);
+        setIsCamOn(prev => !prev);
     }, []);
 
     const hangUp = useCallback(() => {
-        localStreamRef.current?.getTracks().forEach(t => t.stop());
+        wsRef.current?.send(JSON.stringify({ type: 'hangup', data: {} }));
         pcRef.current?.close();
-        sendSignal('hangup', {});
-    }, [sendSignal]);
+        wsRef.current?.close();
+        localStreamRef.current?.getTracks().forEach(t => t.stop());
+    }, []);
 
-    return {
-        localVideoRef, remoteVideoRef,
-        connectionState,
-        isMicOn, isCamOn,
-        toggleMic, toggleCam, hangUp,
+    return { 
+        localVideoRef, remoteVideoRef, connectionState, 
+        isMicOn, isCamOn, toggleMic, toggleCam, hangUp 
     };
 }

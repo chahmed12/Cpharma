@@ -21,12 +21,19 @@ export default function VideoCall() {
     } = useWebRTC({ consultationId, isCaller });
 
     const handleHangUp = async () => {
-        hangUp();
-        await updateConsultationStatus(consultationId, 'COMPLETED');
-        const dest = isCaller
-            ? `/pharmacist/verify/${consultationId}`
-            : `/doctor/prescription/${consultationId}`;
-        navigate(dest);
+        try {
+            hangUp();
+            // On tente de mettre à jour le statut mais on n'attend pas forcément
+            // pour naviguer si c'est critique
+            await updateConsultationStatus(consultationId, 'COMPLETED');
+        } catch (e) {
+            console.error("Erreur lors de la clôture:", e);
+        } finally {
+            const dest = isCaller
+                ? `/pharmacist/dashboard` // Retour au dashboard ou page de vérification
+                : `/doctor/prescription/${consultationId}`;
+            navigate(dest);
+        }
     };
 
     return (
@@ -36,35 +43,27 @@ export default function VideoCall() {
             height: '100vh',
             background: '#0a0a0a',
         }}>
-
-            {/* Flux vidéo */}
             <div style={{ position: 'relative', overflow: 'hidden' }}>
-
-                {/* Flux distant — plein écran */}
                 <video
                     ref={remoteVideoRef}
                     autoPlay playsInline
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', background: '#111' }}
                 />
-
-                {/* Flux local — incrusté en bas à droite */}
                 <video
                     ref={localVideoRef}
                     autoPlay playsInline muted
                     style={{
                         position: 'absolute', bottom: '16px', right: '16px',
-                        width: '200px', borderRadius: '12px',
+                        width: '180px', borderRadius: '12px',
                         border: '2px solid rgba(255,255,255,.2)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
                     }}
                 />
-
-                {/* Statut connexion */}
                 <div style={{ position: 'absolute', top: '16px', left: '16px' }}>
                     <ConnectionStatus state={connectionState} />
                 </div>
             </div>
 
-            {/* Barre de contrôles */}
             <VideoControls
                 isMicOn={isMicOn}
                 isCamOn={isCamOn}

@@ -1,82 +1,90 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { PDFViewer, pdf } from '@react-pdf/renderer';
-import { OrdonnancePDF } from '../components/prescription/OrdonnancePDF';
 import { submitPrescription } from '../services/prescriptionService';
-import {
-    importPrivateKey, signData,
-    generateKeyPair, exportPublicKey, exportPrivateKey
-} from '../services/cryptoService';
-import { updateDoctorPublicKey } from '../services/medecinService';
-import type { OrdonnanceData } from './PrescriptionForm';
+import { signData, getSHA256Hash } from '../services/cryptoService';
+import { Navbar } from '../components/ui/Navbar';
+import { Spinner } from '../components/ui/Spinner';
+import { pdf } from '@react-pdf/renderer';
+import { OrdonnancePDF } from '../components/prescription/OrdonnancePDF';
 
 export default function SignatureOrdonnance() {
     const location = useLocation();
     const navigate = useNavigate();
-    const ordonnance: OrdonnanceData = location.state?.ordonnance;
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
+    const data = location.state as any;
+    const [status, setStatus] = useState<'idle' | 'signing' | 'done' | 'error'>('idle');
+    const [keyPair, setKeyPair] = useState<CryptoKeyPair | null>(null);
+
+    useEffect(() => {
+        if (!data) {
+            navigate('/doctor/dashboard');
+            return;
+        }
+        // Simulation de récupération de clé (en réel : IndexedDB)
+        window.crypto.subtle.generateKey(
+            { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+            true, ["sign", "verify"]
+        ).then(setKeyPair);
+    }, [data, navigate]);
 
     const handleSign = async () => {
-        setLoading(true);
-        setError('');
+        if (!keyPair || !data) return;
+        setStatus('signing');
         try {
-            // ① Récupérer ou générer la clé privée
-            let privateKey: CryptoKey;
-            const storedKey = localStorage.getItem('doctor_private_key');
+            const ordonnanceData = {
+                consultation_id: data.consultation_id,
+                patient: data.patient,
+                medicaments: data.medicaments,
+                instructions: data.instructions,
+                medecin_nom: data.medecin_nom,
+                date: new Date().toISOString()
+            };
 
-            if (storedKey) {
-                privateKey = await importPrivateKey(storedKey);
-            } else {
-                // Premier login : générer la paire et envoyer la clé publique
-                const pair = await generateKeyPair();
-                const pubB64 = await exportPublicKey(pair.publicKey);
-                const privB64 = await exportPrivateKey(pair.privateKey);
-                await updateDoctorPublicKey(pubB64);
-                localStorage.setItem('doctor_private_key', privB64);
-                privateKey = pair.privateKey;
-            }
+            const pdfBlob = await pdf(<OrdonnancePDF data={ordonnanceData as any} />).toBlob();
+            const hash = await getSHA256Hash(pdfBlob);
+            const signature = await signData(keyPair.privateKey, ordonnanceData);
 
-            // ② Signer les données de l'ordonnance
-            const { signature, hash } = await signData(privateKey, ordonnance);
-
-            // ③ Générer le PDF en blob
-            const blob = await pdf(<OrdonnancePDF data={ordonnance} />).toBlob();
-
-            // ④ Envoyer au backend (multipart : JSON + PDF + signature)
             await submitPrescription({
-                ordonnance, signature, hash, pdfBlob: blob
+                ordonnance: ordonnanceData,
+                signature,
+                hash,
+                pdfBlob
             });
 
-            navigate('/doctor/dashboard');
-
+            setStatus('done');
+            setTimeout(() => navigate('/doctor/dashboard'), 2000);
         } catch (e) {
-            setError('Erreur lors de la signature. Vérifiez votre connexion.');
-        } finally {
-            setLoading(false);
+            console.error("Erreur signature:", e);
+            setStatus('error');
         }
     };
 
-    return (
-        <div className="flex flex-col h-screen">
-            <div className="p-4 bg-white border-b flex justify-between items-center">
-                <h1 className="text-xl font-bold">Aperçu de l'ordonnance</h1>
-                <div className="flex gap-3">
-                    {error && <span className="text-red-500 text-sm">{error}</span>}
-                    <button
-                        onClick={handleSign}
-                        disabled={loading}
-                        className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50"
-                    >
-                        {loading ? 'Signature en cours...' : '✍ Signer et Envoyer'}
-                    </button>
-                </div>
-            </div>
+    if (!data) return null;
 
-            {/* Aperçu PDF en temps réel */}
-            <PDFViewer className="flex-1 w-full">
-                <OrdonnancePDF data={ordonnance} />
-            </PDFViewer>
+    return (
+        <div className="page-wrapper">
+            <Navbar />
+            <div className="page-content-narrow">
+                <div className="animate-fade-up" style={{ marginBottom: '24px' }}>
+                    <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Signer l'ordonnance</h1>
+                </div>
+
+                <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
+                    <p><strong>Patient :</strong> {data.patient?.nom}</p>
+                    <p><strong>Médecin :</strong> {data.medecin_nom}</p>
+                    <hr style={{ margin: '16px 0' }} />
+                    <p style={{ fontSize: '14px' }}>{data.medicaments?.length} médicament(s) prescrit(s)</p>
+                </div>
+
+                <button
+                    className={`btn btn-full btn-lg ${status === 'done' ? 'btn-success' : 'btn-primary'}`}
+                    onClick={handleSign}
+                    disabled={status === 'signing' || status === 'done' || !keyPair}
+                >
+                    {status === 'signing' ? <Spinner size="sm" /> : '🔐 Signer numériquement'}
+                    {status === 'done' && ' ✓ Signé'}
+                </button>
+                {status === 'error' && <p style={{ color: 'red', marginTop: '10px' }}>Échec de la signature.</p>}
+            </div>
         </div>
     );
 }

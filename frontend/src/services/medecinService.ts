@@ -12,15 +12,15 @@ export interface Doctor {
 
 // Pharmacien : liste des médecins disponibles (ONLINE)
 export async function getAvailableDoctors(): Promise<Doctor[]> {
-    const { data } = await api.get<Doctor[]>('/doctors/online/');
+    const { data } = await api.get<Doctor[]>('/doctors');
     return data;
 }
 
-// Médecin : met à jour son propre statut
-export async function updateDoctorStatus(
-    status: DoctorStatus
-): Promise<void> {
-    await api.patch('/doctors/status/', { status });
+// src/services/medecinService.ts
+
+export async function updateDoctorStatus(status: 'ONLINE' | 'OFFLINE' | 'BUSY') {
+    const { data } = await api.patch('/doctors/status/', { status }); // ← slash final
+    return data;
 }
 
 
@@ -28,3 +28,4 @@ export async function updateDoctorStatus(
 export async function updateDoctorPublicKey(publicKey: string) {
     await api.patch('/doctors/public-key/', { public_key: publicKey });
 }
+

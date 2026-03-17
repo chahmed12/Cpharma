@@ -1,64 +1,154 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { verifyPrescription } from '../services/prescriptionService';
-import { verifySignature } from '../services/cryptoService';
-import { SignatureViewer } from '../components/prescription/SignatureViewer';
+import { Navbar } from '../components/ui/Navbar';
+import { Spinner } from '../components/ui/Spinner';
 
 export default function PrescriptionVerification() {
     const { hash } = useParams<{ hash: string }>();
-    const [result, setResult] = useState<{ isValid: boolean; data: unknown } | null>(null);
-    const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
+    const [status, setStatus] = useState<'loading' | 'valid' | 'invalid'>('loading');
+    const [prescription, setPrescription] = useState<any>(null);
+    const [confirming, setConfirming] = useState(false);
 
     useEffect(() => {
-        async function verify() {
-            try {
-                // 1. Récupère ordonnance + signature + clé publique du médecin
-                const prescription = await verifyPrescription(hash!);
-
-                // 2. Vérifie la signature côté client (double vérification)
-                const isValid = await verifySignature(
-                    prescription.medecin_public_key,
-                    prescription.signature,
-                    prescription.ordonnance_data
-                );
-
-                setResult({ isValid, data: prescription });
-            } catch {
-                setResult({ isValid: false, data: null });
-            } finally {
-                setLoading(false);
-            }
-        }
-        verify();
+        if (hash)
+            verifyPrescription(hash)
+                .then(data => {
+                    setPrescription(data);
+                    setStatus('valid');
+                })
+                .catch(() => setStatus('invalid'));
     }, [hash]);
 
-    if (loading) return <div className="p-8 text-center">Vérification en cours...</div>;
-    if (!result) return null;
-
-    const p = result.data as any;
+    const handleConfirm = async () => {
+        setConfirming(true);
+        navigate(`/pharmacist/confirm/${prescription?.consultation_id}`);
+    };
 
     return (
-        <div className="max-w-2xl mx-auto p-6">
-            <h1 className="text-2xl font-bold mb-6">Vérification de l'ordonnance</h1>
+        <div className="page-wrapper">
+            <Navbar />
+            <div className="page-content-narrow">
 
-            <SignatureViewer
-                isValid={result.isValid}
-                medecinNom={p?.ordonnance_data?.medecin_nom ?? ''}
-                date={p?.ordonnance_data?.date ?? ''}
-                hash={p?.sha256_hash ?? ''}
-            />
+                {/* Loading */}
+                {status === 'loading' && (
+                    <div style={{
+                        display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', gap: '16px', paddingTop: '60px',
+                    }}>
+                        <Spinner size="lg" dark />
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+                            Vérification de la signature RSA...
+                        </p>
+                    </div>
+                )}
 
-            {result.isValid && (
-                <div className="mt-6 p-4 bg-gray-50 rounded-xl">
-                    <h2 className="font-bold mb-3">Médicaments prescrits</h2>
-                    {p?.ordonnance_data?.medicaments?.map((m: any, i: number) => (
-                        <div key={i} className="flex justify-between py-2 border-b">
-                            <span className="font-medium">{m.nom}</span>
-                            <span className="text-gray-500">{m.posologie} — {m.duree}</span>
+                {/* Résultat invalide */}
+                {status === 'invalid' && (
+                    <div className="animate-fade-up">
+                        <div style={{
+                            background: 'var(--red-50)',
+                            border: '2px solid var(--red-200)',
+                            borderRadius: 'var(--radius-lg)',
+                            padding: '40px', textAlign: 'center',
+                            marginBottom: '24px',
+                        }}>
+                            <div style={{
+                                fontSize: '48px', marginBottom: '12px',
+                            }}>❌</div>
+                            <p style={{
+                                fontFamily: 'var(--font-display)',
+                                fontSize: '20px', fontWeight: '700',
+                                color: 'var(--red-600)', marginBottom: '8px',
+                            }}>
+                                Ordonnance invalide
+                            </p>
+                            <p style={{ color: 'var(--red-600)', fontSize: '14px' }}>
+                                La signature numérique est incorrecte ou le document a été altéré.
+                                Ne pas délivrer les médicaments.
+                            </p>
                         </div>
-                    ))}
-                </div>
-            )}
+                        <button
+                            className="btn btn-secondary btn-full"
+                            onClick={() => navigate('/pharmacist/dashboard')}
+                        >
+                            Retour au tableau de bord
+                        </button>
+                    </div>
+                )}
+
+                {/* Résultat valide */}
+                {status === 'valid' && (
+                    <div className="animate-fade-up">
+
+                        {/* Badge valide */}
+                        <div style={{
+                            background: 'var(--green-50)',
+                            border: '2px solid var(--green-100)',
+                            borderRadius: 'var(--radius-lg)',
+                            padding: '28px', textAlign: 'center',
+                            marginBottom: '24px',
+                        }}>
+                            <div style={{ fontSize: '40px', marginBottom: '8px' }}>✅</div>
+                            <p style={{
+                                fontFamily: 'var(--font-display)',
+                                fontSize: '18px', fontWeight: '700',
+                                color: 'var(--green-700)', marginBottom: '4px',
+                            }}>
+                                Signature valide
+                            </p>
+                            <p style={{ fontSize: '13px', color: 'var(--green-600)' }}>
+                                L'authenticité de cette ordonnance est confirmée.
+                            </p>
+                        </div>
+
+                        {/* Ordonnance complète */}
+                        {prescription && (
+                            <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
+                                <div style={{
+                                    display: 'flex', justifyContent: 'space-between',
+                                    marginBottom: '16px', paddingBottom: '14px',
+                                    borderBottom: '1px solid var(--border)',
+                                }}>
+                                    <div>
+                                        <p style={{ fontWeight: '700', fontSize: '14px' }}>{prescription.medecin_nom}</p>
+                                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Patient : {prescription.patient_nom}</p>
+                                    </div>
+                                    <span className="badge badge-paid">Signée</span>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {prescription.medicaments?.map((m: any, i: number) => (
+                                        <div key={i} style={{
+                                            padding: '10px 12px',
+                                            background: 'var(--bg-subtle)',
+                                            borderRadius: 'var(--radius-sm)',
+                                        }}>
+                                            <p style={{ fontWeight: '600', fontSize: '13px' }}>{m.nom}</p>
+                                            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                {[m.posologie, m.duree].filter(Boolean).join(' · ')}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Bouton confirmer la délivrance */}
+                        <button
+                            className="btn btn-success btn-full btn-lg"
+                            onClick={handleConfirm}
+                            disabled={confirming}
+                        >
+                            {confirming
+                                ? (<><Spinner size="sm" /> Traitement...</>)
+                                : '✓ Confirmer la délivrance des médicaments →'
+                            }
+                        </button>
+                    </div>
+                )}
+
+            </div>
         </div>
     );
 }

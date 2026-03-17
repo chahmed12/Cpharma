@@ -1,5 +1,6 @@
 from django.db   import models
 from django.conf import settings
+from apps.patients.models import Patient
 
 class Consultation(models.Model):
 
@@ -19,8 +20,15 @@ class Consultation(models.Model):
         on_delete=models.CASCADE,
         related_name='consultations_recues'
     )
-    patient_nom  = models.CharField(max_length=100)
-    patient_age  = models.PositiveIntegerField()
+    
+    # Nouveau : Relation avec le modèle Patient
+    patient      = models.ForeignKey(
+        Patient,
+        on_delete=models.CASCADE,
+        related_name='consultations',
+        null=True # null=True temporairement pour la migration si besoin
+    )
+
     motif        = models.TextField()
     status       = models.CharField(
         max_length=20,
@@ -33,4 +41,4 @@ class Consultation(models.Model):
         ordering = ['created_at']
 
     def __str__(self):
-        return f'Consultation #{self.id} — {self.patient_nom} ({self.status})'
+        return f'Consultation #{self.id} — {self.patient.nom if self.patient else "Inconnu"} ({self.status})'

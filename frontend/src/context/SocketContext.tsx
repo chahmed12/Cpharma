@@ -1,65 +1,86 @@
-import { createContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
-// ─── Types ────────────────────────────────────────────
-type EventHandler = (data: unknown) => void;
+type EventHandler = (data: any) => void;
 
 interface SocketContextType {
     isConnected: boolean;
-    send: (type: string, payload: unknown) => void;
+    send: (type: string, payload: any) => void;
     on: (event: string, handler: EventHandler) => void;
     off: (event: string, handler: EventHandler) => void;
 }
 
 export const SocketContext = createContext<SocketContextType>(null!);
 
-// ─── Provider ─────────────────────────────────────────
 export function SocketProvider({ children }: { children: ReactNode }) {
     const { token, isAuthenticated } = useAuth();
     const wsRef = useRef<WebSocket | null>(null);
     const handlersRef = useRef<Map<string, Set<EventHandler>>>(new Map());
     const [isConnected, setIsConnected] = useState(false);
 
+    // Initialisation de la WebSocket
     useEffect(() => {
-        if (!isAuthenticated || !token) return;
+        if (!isAuthenticated || !token) {
+            if (wsRef.current) {
+                wsRef.current.close();
+                wsRef.current = null;
+            }
+            setIsConnected(false);
+            return;
+        }
 
-        const WS_URL = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8000/ws';
-        const ws = new WebSocket(`${WS_URL}/queue/?token=${token}`);
+        // On utilise l'URL absolue ou relative selon l'env
+        let wsUrl = import.meta.env.VITE_WS_URL;
+        if (!wsUrl) {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host.includes('localhost') ? 'localhost:8000' : window.location.host;
+            wsUrl = `${protocol}//${host}/ws`;
+        }
+        
+        const ws = new WebSocket(`${wsUrl}/queue/?token=${token}`);
         wsRef.current = ws;
 
         ws.onopen = () => setIsConnected(true);
         ws.onclose = () => setIsConnected(false);
-
-        // Dispatch des messages entrants vers les handlers enregistrés
         ws.onmessage = (event) => {
-            const { type, payload } = JSON.parse(event.data);
-            const handlers = handlersRef.current.get(type);
-            handlers?.forEach(h => h(payload));
+            try {
+                const data = JSON.parse(event.data);
+                const handlers = handlersRef.current.get(data.type);
+                handlers?.forEach(h => h(data.payload));
+            } catch (e) {
+                console.error("Erreur WS:", e);
+            }
         };
 
-        return () => ws.close();
+        return () => {
+            ws.close();
+        };
     }, [isAuthenticated, token]);
 
-    // ── send : émet un message JSON ──────────────────────
-    const send = (type: string, payload: unknown) => {
+    // Fonctions stables avec useCallback
+    const send = useCallback((type: string, payload: any) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({ type, payload }));
         }
-    };
+    }, []);
 
-    // ── on/off : abonnement aux événements ───────────────
-    const on = (event: string, handler: EventHandler) => {
+    const on = useCallback((event: string, handler: EventHandler) => {
         if (!handlersRef.current.has(event))
             handlersRef.current.set(event, new Set());
         handlersRef.current.get(event)!.add(handler);
-    };
+    }, []);
 
-    const off = (event: string, handler: EventHandler) => {
+    const off = useCallback((event: string, handler: EventHandler) => {
         handlersRef.current.get(event)?.delete(handler);
-    };
+    }, []);
+
+    // Valeur du contexte mémoïsée pour éviter de re-render toute l'app
+    const value = useMemo(() => ({
+        isConnected, send, on, off
+    }), [isConnected, send, on, off]);
 
     return (
-        <SocketContext.Provider value={{ isConnected, send, on, off }}>
+        <SocketContext.Provider value={value}>
             {children}
         </SocketContext.Provider>
     );

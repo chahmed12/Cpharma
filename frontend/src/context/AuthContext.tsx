@@ -1,7 +1,6 @@
-import { createContext, useState, useEffect, type ReactNode } from 'react';
-import { loginUser, refreshAccessToken } from '../services/authService';
+import { createContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
+import { loginUser } from '../services/authService';
 
-// ─── Types ────────────────────────────────────────────
 export type Role = 'MEDECIN' | 'PHARMACIEN';
 
 export interface AuthUser {
@@ -21,16 +20,13 @@ interface AuthContextType {
     logout: () => void;
 }
 
-// ─── Création du contexte ──────────────────────────────
 export const AuthContext = createContext<AuthContextType>(null!);
 
-// ─── Provider ─────────────────────────────────────────
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Rechargement session depuis localStorage au montage
     useEffect(() => {
         const storedToken = localStorage.getItem('access_token');
         const storedUser = localStorage.getItem('user');
@@ -40,41 +36,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             try {
                 setUser(JSON.parse(storedUser));
             } catch (e) {
-                console.error("Erreur de lecture du localStorage", e);
+                console.error("Session corrompue", e);
+                localStorage.clear();
             }
         }
         setIsLoading(false);
     }, []);
 
-    // ── login ────────────────────────────────────────────
-    // AuthContext.tsx — modifier la fonction login
-
-    const login = async (email: string, password: string): Promise<AuthUser> => {
+    const login = useCallback(async (email: string, password: string): Promise<AuthUser> => {
         const data = await loginUser({ email, password });
         localStorage.setItem('access_token', data.access);
         localStorage.setItem('refresh_token', data.refresh);
         localStorage.setItem('user', JSON.stringify(data.user));
         setToken(data.access);
         setUser(data.user);
-        return data.user; // ← retourner l'user
-    };
+        return data.user;
+    }, []);
 
-    // ── logout ───────────────────────────────────────────
-    const logout = () => {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
+    const logout = useCallback(() => {
+        localStorage.clear();
         setToken(null);
         setUser(null);
-    };
+    }, []);
+
+    const value = useMemo(() => ({
+        user, token, isLoading,
+        isAuthenticated: !!token,
+        login, logout
+    }), [user, token, isLoading, login, logout]);
 
     return (
-        <AuthContext.Provider value={{
-            user, token, isLoading,
-            isAuthenticated: !!token,
-            login, logout
-        }}>
-            {isLoading ? <div>Chargement de la session...</div> : children}
+        <AuthContext.Provider value={value}>
+            {/* On ne bloque le rendu QUE si on est en train de vérifier la session au tout début */}
+            {isLoading ? (
+                <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '30px', height: '30px', border: '3px solid #eee', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />
+                </div>
+            ) : children}
         </AuthContext.Provider>
     );
 }

@@ -1,168 +1,166 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createConsultation } from '../services/consultationService';
+import { searchPatients, createPatient, type Patient } from '../services/patientService';
 import { Navbar } from '../components/ui/Navbar';
 import { Spinner } from '../components/ui/Spinner';
-
-interface Doctor {
-    id: number;
-    nom: string;
-    prenom: string;
-    specialite: string;
-}
 
 export default function NewConsultation() {
     const navigate = useNavigate();
     const location = useLocation();
+    const selectedDoctor = location.state?.selectedDoctor;
 
-    // Médecin pré-sélectionné depuis PharmacistDashboard
-    const selectedDoctor: Doctor | null =
-        location.state?.selectedDoctor ?? null;
-
-    const [form, setForm] = useState({
-        patient_nom: '',
-        patient_age: '',
-        patient_motif: '',
-        patient_sexe: 'M' as 'M' | 'F',
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<Patient[]>([]);
+    const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+    const [isCreatingNew, setIsCreatingNew] = useState(false);
+    
+    // Formulaire nouveau patient
+    const [newPatient, setNewPatient] = useState({
+        nom: '', prenom: '', telephone: '', date_naissance: '', sexe: 'M' as 'M' | 'F',
+        medical_record: { allergies: '', antecedents: '', groupe_sanguin: '' }
     });
+
+    const [motif, setMotif] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const set = (k: string, v: string) =>
-        setForm(p => ({ ...p, [k]: v }));
+    // Recherche temps réel
+    useEffect(() => {
+        if (searchQuery.length > 2) {
+            searchPatients(searchQuery).then(setSearchResults);
+        } else {
+            setSearchResults([]);
+        }
+    }, [searchQuery]);
 
     const handleSubmit = async () => {
-        if (!form.patient_nom.trim() || !form.patient_motif.trim()) {
-            setError('Le nom et le motif sont obligatoires.');
-            return;
-        }
-        if (!selectedDoctor) {
-            setError('Aucun médecin sélectionné. Retournez au tableau de bord.');
-            return;
-        }
+        if (!selectedDoctor) return setError("Médecin non sélectionné");
+        if (!motif) return setError("Motif obligatoire");
 
         setLoading(true);
-        setError('');
         try {
-            // Crée la consultation → le backend notifie le médecin via WebSocket
+            let patientId = selectedPatient?.id;
+
+            // Si nouveau patient, on le crée d'abord
+            if (isCreatingNew) {
+                const created = await createPatient(newPatient);
+                patientId = created.id;
+            }
+
+            if (!patientId) throw new Error("Patient manquant");
+
             const consultation = await createConsultation({
                 medecin_id: selectedDoctor.id,
-                patient_nom: form.patient_nom,
-                patient_age: Number(form.patient_age),
-                patient_motif: form.patient_motif,
-                patient_sexe: form.patient_sexe,
-            });
+                patient_id: patientId,
+                motif
+            } as any);
 
-            // Redirection vers la salle d'attente
             navigate(`/pharmacist/waiting/${consultation.id}`);
-
-        } catch {
-            setError('Erreur lors de la création de la consultation.');
+        } catch (err) {
+            setError("Erreur lors de la création");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="page-wrapper">
             <Navbar />
-            <div className="max-w-lg mx-auto p-6">
-                <button
-                    onClick={() => navigate('/pharmacist/dashboard')}
-                    className="text-sm text-gray-400 hover:text-gray-600 mb-4 block"
-                >
-                    ← Retour au tableau de bord
-                </button>
+            <div className="page-content-narrow">
+                <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '24px', marginBottom: '20px' }}>
+                    Nouvelle Consultation
+                </h1>
 
-                <h1 className="text-2xl font-bold mb-2">Nouvelle consultation</h1>
-
-                {/* Médecin sélectionné */}
-                {selectedDoctor && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                            {selectedDoctor.prenom[0]}{selectedDoctor.nom[0]}
-                        </div>
+                {/* Étape 1 : Sélection Patient */}
+                <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
+                    <p className="section-title">1. Sélection du Patient</p>
+                    
+                    {!selectedPatient && !isCreatingNew && (
                         <div>
-                            <p className="font-semibold text-blue-800">
-                                Dr. {selectedDoctor.prenom} {selectedDoctor.nom}
-                            </p>
-                            <p className="text-sm text-blue-600">{selectedDoctor.specialite} — En ligne</p>
-                        </div>
-                    </div>
-                )}
-
-                {/* Formulaire patient */}
-                <div className="bg-white border rounded-2xl p-6 flex flex-col gap-4">
-                    <h2 className="font-semibold text-gray-700">Informations du patient</h2>
-
-                    {/* Nom */}
-                    <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">
-                            Nom complet *
-                        </label>
-                        <input
-                            placeholder="Ex : Ahmed Benali"
-                            value={form.patient_nom}
-                            onChange={e => set('patient_nom', e.target.value)}
-                            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-
-                    {/* Age + Sexe */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Âge</label>
-                            <input
-                                type="number"
-                                placeholder="35"
-                                min="0" max="120"
-                                value={form.patient_age}
-                                onChange={e => set('patient_age', e.target.value)}
-                                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            <input 
+                                className="input" 
+                                placeholder="Rechercher par nom ou téléphone..." 
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
                             />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">Sexe</label>
-                            <select
-                                value={form.patient_sexe}
-                                onChange={e => set('patient_sexe', e.target.value)}
-                                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                            >
-                                <option value="M">Masculin</option>
-                                <option value="F">Féminin</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Motif */}
-                    <div>
-                        <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase">
-                            Motif de consultation *
-                        </label>
-                        <textarea
-                            placeholder="Décrire brièvement les symptômes ou la raison de la consultation..."
-                            value={form.patient_motif}
-                            onChange={e => set('patient_motif', e.target.value)}
-                            rows={3}
-                            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                        />
-                    </div>
-
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-4 py-2.5">
-                            {error}
+                            <div style={{ marginTop: '10px' }}>
+                                {searchResults.map(p => (
+                                    <div 
+                                        key={p.id} 
+                                        onClick={() => setSelectedPatient(p)}
+                                        style={{ padding: '10px', borderBottom: '1px solid #eee', cursor: 'pointer' }}
+                                    >
+                                        {p.prenom} {p.nom} - {p.telephone}
+                                    </div>
+                                ))}
+                                <button 
+                                    className="btn btn-secondary btn-sm" 
+                                    style={{ marginTop: '10px', width: '100%' }}
+                                    onClick={() => setIsCreatingNew(true)}
+                                >
+                                    + Nouveau Patient
+                                </button>
+                            </div>
                         </div>
                     )}
 
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading}
-                        className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                        {loading && <Spinner size="sm" />}
-                        {loading ? 'Envoi au médecin...' : 'Démarrer la consultation →'}
-                    </button>
+                    {selectedPatient && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <p style={{ fontWeight: 'bold' }}>{selectedPatient.prenom} {selectedPatient.nom}</p>
+                                <p style={{ fontSize: '12px', color: 'gray' }}>Tél: {selectedPatient.telephone}</p>
+                            </div>
+                            <button className="btn btn-sm" onClick={() => setSelectedPatient(null)}>Changer</button>
+                        </div>
+                    )}
+
+                    {isCreatingNew && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                <input className="input" placeholder="Prénom" onChange={e => setNewPatient({...newPatient, prenom: e.target.value})} />
+                                <input className="input" placeholder="Nom" onChange={e => setNewPatient({...newPatient, nom: e.target.value})} />
+                            </div>
+                            <input className="input" placeholder="Téléphone" onChange={e => setNewPatient({...newPatient, telephone: e.target.value})} />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                <input className="input" type="date" onChange={e => setNewPatient({...newPatient, date_naissance: e.target.value})} />
+                                <select className="input" onChange={e => setNewPatient({...newPatient, sexe: e.target.value as any})}>
+                                    <option value="M">Masculin</option>
+                                    <option value="F">Féminin</option>
+                                </select>
+                            </div>
+                            <p className="section-title" style={{ marginTop: '10px' }}>Infos Médicales (Optionnel)</p>
+                            <textarea 
+                                className="input" 
+                                placeholder="Allergies (ex: Pénicilline)" 
+                                onChange={e => setNewPatient({...newPatient, medical_record: {...newPatient.medical_record, allergies: e.target.value}})} 
+                            />
+                            <button className="btn btn-sm" onClick={() => setIsCreatingNew(false)}>Annuler</button>
+                        </div>
+                    )}
                 </div>
+
+                {/* Étape 2 : Motif */}
+                <div className="card" style={{ padding: '20px', marginBottom: '20px' }}>
+                    <p className="section-title">2. Motif de consultation</p>
+                    <textarea 
+                        className="input" 
+                        placeholder="Pourquoi le patient consulte-t-il ?" 
+                        rows={3}
+                        value={motif}
+                        onChange={e => setMotif(e.target.value)}
+                    />
+                </div>
+
+                {error && <p style={{ color: 'red', marginBottom: '10px' }}>{error}</p>}
+
+                <button 
+                    className="btn btn-primary btn-full btn-lg" 
+                    onClick={handleSubmit}
+                    disabled={loading || (!selectedPatient && !isCreatingNew)}
+                >
+                    {loading ? <Spinner size="sm" /> : 'Démarrer la consultation →'}
+                </button>
             </div>
         </div>
     );

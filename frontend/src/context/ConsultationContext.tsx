@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, type ReactNode } from 'react';
+import { createContext, useState, useContext, useMemo, type ReactNode } from 'react';
 import type { ConsultationStatus } from '../services/consultationService';
 
 interface ConsultationState {
@@ -17,19 +17,22 @@ export function ConsultationProvider({ children }: { children: ReactNode }) {
     const [status, setStatus] = useState<ConsultationStatus | null>(null);
     const [patientNom, setPatientNom] = useState<string | null>(null);
 
+    const value = useMemo(() => ({
+        consultationId, status, patientNom,
+        setConsultation: (id: number, nom: string) => {
+            setConsultationId(id);
+            setPatientNom(nom);
+        },
+        setStatus,
+        reset: () => {
+            setConsultationId(null);
+            setStatus(null);
+            setPatientNom(null);
+        },
+    }), [consultationId, status, patientNom]);
+
     return (
-        <ConsultationContext.Provider value={{
-            consultationId, status, patientNom,
-            setConsultation: (id, nom) => {
-                setConsultationId(id); setPatientNom(nom);
-            },
-            setStatus,
-            reset: () => {
-                setConsultationId(null);
-                setStatus(null);
-                setPatientNom(null);
-            },
-        }}>
+        <ConsultationContext.Provider value={value}>
             {children}
         </ConsultationContext.Provider>
     );

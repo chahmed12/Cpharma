@@ -1,17 +1,116 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAvailableDoctors, type Doctor } from '../services/medecinService';
-import { getQueue, type Consultation } from '../services/consultationService';
+import { getAvailableDoctors, type Doctor }
+    from '../services/medecinService';
+import { getQueue, type Consultation }
+    from '../services/consultationService';
 import { useSocket } from '../hooks/useSocket';
 import { Navbar } from '../components/ui/Navbar';
-import { Spinner } from '../components/ui/Spinner';
 
-const STATUS_BADGE = {
-    ONLINE: 'bg-green-100 text-green-700',
-    BUSY: 'bg-amber-100 text-amber-700',
-    OFFLINE: 'bg-gray-100 text-gray-500',
-};
+// ── Composant skeleton card ────────────────────────
+function SkeletonCard() {
+    return (
+        <div className="card" style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <div className="skeleton" style={{ width: '44px', height: '44px', borderRadius: '12px' }} />
+                <div className="skeleton" style={{ width: '70px', height: '22px', borderRadius: '20px' }} />
+            </div>
+            <div className="skeleton" style={{ width: '70%', height: '16px', marginBottom: '8px' }} />
+            <div className="skeleton" style={{ width: '50%', height: '12px', marginBottom: '16px' }} />
+            <div className="skeleton" style={{ width: '100%', height: '36px', borderRadius: '8px' }} />
+        </div>
+    );
+}
 
+// ── Carte médecin ──────────────────────────────────
+function DoctorCard({ doc, index, onStart }: {
+    doc: Doctor; index: number; onStart: (doc: Doctor) => void;
+}) {
+    const isOnline = doc.status === 'ONLINE';
+    const isBusy = doc.status === 'BUSY';
+    const delayClass = `delay-${(index % 4) + 1}`;
+    const badgeClass = isOnline
+        ? 'badge badge-online'
+        : isBusy ? 'badge badge-busy' : 'badge badge-offline';
+    const badgeText = isOnline ? 'Disponible'
+        : isBusy ? 'Occupé' : 'Hors ligne';
+
+    return (
+        <div className={`card animate-fade-up ${delayClass}`}
+            style={{ padding: '20px' }}>
+
+            {/* Header carte — avatar + badge */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                marginBottom: '14px',
+            }}>
+                {/* Avatar initiales */}
+                <div style={{
+                    width: '44px', height: '44px',
+                    background: 'linear-gradient(135deg, var(--blue-600), #6366f1)',
+                    borderRadius: '12px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontWeight: '700', fontSize: '15px',
+                    flexShrink: 0,
+                }}>
+                    {doc.prenom[0]}{doc.nom[0]}
+                </div>
+
+                {/* Badge statut */}{/* Point pulsant pour online */}
+                <span className={badgeClass}>
+                    {isOnline && (
+
+                        < span style={{
+                            display: 'inline-block',
+                            width: '6px', height: '6px',
+                            borderRadius: '50%',
+                            background: 'var(--green-600)',
+                            boxShadow: '0 0 0 2px rgba(22,163,74,.3)',
+                            animation: 'pulse 2s infinite',
+                        }} />
+                    )}
+                    {badgeText}
+                </span>
+            </div>
+
+            {/* Nom + spécialité */}
+            <p style={{
+                fontWeight: '700', fontSize: '15px',
+                color: 'var(--text-primary)', marginBottom: '3px',
+            }}>
+                Dr. {doc.prenom} {doc.nom}
+            </p>
+            <p style={{
+                fontSize: '13px',
+                color: 'var(--text-muted)',
+                marginBottom: '16px',
+            }}>
+                {doc.specialite}
+            </p>
+
+            {/* Bouton action */}
+            {isOnline ? (
+                <button
+                    className="btn btn-primary btn-full"
+                    onClick={() => onStart(doc)}
+                >
+                    Démarrer une consultation →
+                </button>
+            ) : (
+                <button
+                    className="btn btn-secondary btn-full"
+                    disabled
+                >
+                    {isBusy ? 'En consultation...' : 'Non disponible'}
+                </button>
+            )}
+        </div>
+    );
+}
+
+// ── Page principale ────────────────────────────────
 export default function PharmacistDashboard() {
     const navigate = useNavigate();
     const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -24,8 +123,7 @@ export default function PharmacistDashboard() {
             setHistory(h);
         }).finally(() => setLoading(false));
     }, []);
-
-    // Mise à jour statut médecin en temps réel via WebSocket
+    // ecouter les changements de statut des médecins
     useSocket('doctor_status_changed', (data) => {
         const { doctor_id, status } = data as any;
         setDoctors(prev =>
@@ -33,77 +131,119 @@ export default function PharmacistDashboard() {
         );
     });
 
-    if (loading) return (
-        <div className="flex items-center justify-center h-screen">
-            <Spinner size="lg" label="Chargement..." />
-        </div>
-    );
+    const onlineCount = doctors.filter(d => d.status === 'ONLINE').length;
+
+    const startConsultation = (doc: Doctor) =>
+        navigate('/pharmacist/new-consultation', { state: { selectedDoctor: doc } });
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="page-wrapper">
             <Navbar />
-            <div className="max-w-5xl mx-auto p-6">
-                <h1 className="text-2xl font-bold mb-6">Tableau de bord</h1>
+            <div className="page-content">
 
-                {/* Médecins disponibles */}
-                <section className="mb-8">
-                    <h2 className="text-lg font-semibold mb-3">
-                        Médecins disponibles
-                        <span className="ml-2 text-sm text-green-600 font-normal">
-                            {doctors.filter(d => d.status === 'ONLINE').length} en ligne
-                        </span>
-                    </h2>
+                {/* Header page */}
+                <div className="animate-fade-up"
+                    style={{ marginBottom: '32px' }}>
+                    <h1 style={{
+                        fontFamily: 'var(--font-display)',
+                        fontSize: '26px', fontWeight: '700',
+                        marginBottom: '6px',
+                    }}>
+                        Tableau de bord
+                    </h1>
+                    <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+                        {loading ? 'Chargement...' : (
+                            <>
+                                <span style={{ color: 'var(--green-600)', fontWeight: '600' }}>
+                                    {onlineCount} médecin{onlineCount !== 1 ? 's' : ''} disponible{onlineCount !== 1 ? 's' : ''}
+                                </span>
+                                {' '}en ce moment
+                            </>
+                        )}
+                    </p>
+                </div>
 
-                    {doctors.length === 0
-                        ? <p className="text-gray-400 text-sm">Aucun médecin disponible</p>
-                        : <div className="grid grid-cols-2 gap-3">
-                            {doctors.map(doc => (
-                                <div key={doc.id}
-                                    className="bg-white border rounded-xl p-4 flex items-center justify-between">
-                                    <div>
-                                        <p className="font-semibold">Dr. {doc.prenom} {doc.nom}</p>
-                                        <p className="text-sm text-gray-400">{doc.specialite}</p>
+                {/* Section médecins */}
+                <section style={{ marginBottom: '48px' }}>
+                    <p className="section-title">Médecins disponibles</p>
+
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                        gap: '14px',
+                    }}>
+                        {loading
+                            ? [1, 2, 3].map(i => <SkeletonCard key={i} />)
+                            : doctors.length === 0
+                                ? (
+                                    <div className="card-flat" style={{
+                                        padding: '48px', textAlign: 'center',
+                                        gridColumn: '1 / -1',
+                                    }}>
+                                        <p style={{ fontSize: '36px', marginBottom: '10px' }}>🩺</p>
+                                        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+                                            Aucun médecin enregistré pour le moment
+                                        </p>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${(STATUS_BADGE as any)[doc.status]
-                                            }`}>{doc.status}</span>
-                                        {doc.status === 'ONLINE' && (
-                                            <button
-                                                onClick={() => navigate(
-                                                    '/pharmacist/new-consultation',
-                                                    { state: { selectedDoctor: doc } }
-                                                )}
-                                                className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-700"
-                                            >
-                                                Consulter
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    }
+                                )
+                                : doctors.map((doc, i) => (
+                                    <DoctorCard
+                                        key={doc.id}
+                                        doc={doc}
+                                        index={i}
+                                        onStart={startConsultation}
+                                    />
+                                ))
+                        }
+                    </div>
                 </section>
 
-                {/* Historique */}
+                {/* Section historique */}
                 <section>
-                    <h2 className="text-lg font-semibold mb-3">Consultations récentes</h2>
-                    <div className="flex flex-col gap-2">
+                    <p className="section-title">Consultations récentes</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {history.length === 0 && !loading && (
+                            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                                Aucune consultation pour le moment.
+                            </p>
+                        )}
                         {history.slice(0, 5).map(c => (
-                            <div key={c.id}
-                                className="bg-white border rounded-xl px-4 py-3 flex justify-between items-center">
+                            <div key={c.id} className="card" style={{
+                                padding: '14px 18px',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                            }}>
                                 <div>
-                                    <p className="font-medium text-sm">{c.patient.nom}</p>
-                                    <p className="text-xs text-gray-400">{c.patient.motif}</p>
+                                    <p style={{
+                                        fontWeight: '600', fontSize: '14px',
+                                        marginBottom: '2px',
+                                    }}>
+                                        {c.patient_details.prenom} {c.patient_details.nom}
+                                    </p>
+                                    <p style={{
+                                        fontSize: '12px', color: 'var(--text-muted)',
+                                    }}>
+                                        {c.motif}
+                                    </p>
                                 </div>
-                                <span className="text-xs text-gray-400">
+                                <p style={{
+                                    fontSize: '12px', color: 'var(--text-muted)',
+                                }}>
                                     {new Date(c.created_at).toLocaleDateString('fr-FR')}
-                                </span>
+                                </p>
                             </div>
                         ))}
                     </div>
                 </section>
+
             </div>
         </div>
     );
 }
+
+/* Ajouter dans index.css :
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 2px rgba(22,163,74,.3); }
+  50%      { box-shadow: 0 0 0 5px rgba(22,163,74,.1); }
+} */
