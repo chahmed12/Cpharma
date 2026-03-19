@@ -18,4 +18,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         return f'{obj.medecin.prenom} {obj.medecin.nom}'
 
     def get_patient_nom(self, obj):
-        return obj.consultation.patient_nom
+        p = getattr(obj.consultation, 'patient', None)
+        if p:
+            return f'{p.prenom} {p.nom}'.strip()
+        return ''

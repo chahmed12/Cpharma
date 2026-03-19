@@ -10,6 +10,12 @@ export default function NewConsultation() {
     const location = useLocation();
     const selectedDoctor = location.state?.selectedDoctor;
 
+    useEffect(() => {
+        if (!selectedDoctor) {
+            navigate('/pharmacist/dashboard');
+        }
+    }, [selectedDoctor, navigate]);
+
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Patient[]>([]);
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
@@ -44,21 +50,34 @@ export default function NewConsultation() {
 
             // Si nouveau patient, on le crée d'abord
             if (isCreatingNew) {
-                const created = await createPatient(newPatient);
-                patientId = created.id;
+                if (!newPatient.nom || !newPatient.prenom || !newPatient.telephone || !newPatient.date_naissance) {
+                    throw new Error("Veuillez renseigner Nom, Prénom, Téléphone et Date de naissance.");
+                }
+                try {
+                    const created = await createPatient(newPatient);
+                    patientId = created.id;
+                } catch (apiErr: any) {
+                     const msgStr = apiErr.response?.data ? JSON.stringify(apiErr.response.data).toLowerCase() : "";
+                     if (msgStr.includes('telephone') || msgStr.includes('existe')) {
+                         throw new Error("Un patient avec ce numéro existe déjà. Veuillez décocher 'Nouveau Patient' et le chercher via la barre haut.");
+                     }
+                     throw apiErr;
+                }
             }
 
             if (!patientId) throw new Error("Patient manquant");
 
             const consultation = await createConsultation({
-                medecin_id: selectedDoctor.id,
+                medecin: selectedDoctor.id,
                 patient_id: patientId,
                 motif
-            } as any);
+            });
 
             navigate(`/pharmacist/waiting/${consultation.id}`);
-        } catch (err) {
-            setError("Erreur lors de la création");
+        } catch (err: any) {
+            console.error("API Error: ", err);
+            const msg = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+            setError("Erreur : " + msg);
         } finally {
             setLoading(false);
         }
@@ -68,8 +87,15 @@ export default function NewConsultation() {
         <div className="page-wrapper">
             <Navbar />
             <div className="page-content-narrow">
+                {selectedDoctor && (
+                    <div style={{ marginBottom: '20px', padding: '12px', background: 'var(--blue-50)', borderRadius: '8px', border: '1px solid var(--blue-100)' }}>
+                        <p style={{ margin: 0, color: 'var(--blue-800)', fontWeight: 'bold' }}>
+                            👨‍⚕️ Nouvelle consultation avec le Dr. {selectedDoctor.prenom} {selectedDoctor.nom}
+                        </p>
+                    </div>
+                )}
                 <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '24px', marginBottom: '20px' }}>
-                    Nouvelle Consultation
+                    Dossier Patient
                 </h1>
 
                 {/* Étape 1 : Sélection Patient */}

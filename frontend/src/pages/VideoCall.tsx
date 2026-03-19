@@ -23,14 +23,15 @@ export default function VideoCall() {
     const handleHangUp = async () => {
         try {
             hangUp();
-            // On tente de mettre à jour le statut mais on n'attend pas forcément
-            // pour naviguer si c'est critique
-            await updateConsultationStatus(consultationId, 'COMPLETED');
+            // Bug B1 fix : seul le médecin clôture la consultation (évite le double COMPLETED)
+            if (!isCaller) {
+                await updateConsultationStatus(consultationId, 'COMPLETED');
+            }
         } catch (e) {
             console.error("Erreur lors de la clôture:", e);
         } finally {
             const dest = isCaller
-                ? `/pharmacist/dashboard` // Retour au dashboard ou page de vérification
+                ? `/pharmacist/waiting-prescription/${consultationId}`
                 : `/doctor/prescription/${consultationId}`;
             navigate(dest);
         }

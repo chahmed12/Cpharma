@@ -28,58 +28,132 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
     useEffect(() => {
         if (!token || !consultationId) return;
 
-        const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
-        const ws = new WebSocket(`${WS_BASE}/webrtc/${consultationId}/?token=${token}`);
+        let isMounted = true;
+        let localMediaReady = false;
+        let peerConnected = false;
+        let offerSent = false;
+
+        // Bug VID-2 fix : URL dynamique (Nginx gère le reverse proxy en prod)
+        let wsUrl = import.meta.env.VITE_WS_URL;
+        if (!wsUrl) {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            wsUrl = `${protocol}//${window.location.host}/ws`;
+        }
+        const ws = new WebSocket(`${wsUrl}/webrtc/${consultationId}/?token=${token}`);
         wsRef.current = ws;
 
         const pc = new RTCPeerConnection(ICE_SERVERS);
         pcRef.current = pc;
 
-        // 1. Médias
-        navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-            localStreamRef.current = stream;
-            if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-            stream.getTracks().forEach(track => pc.addTrack(track, stream));
-        });
-
+        // --- HANDLERS MEDIA ---
         pc.ontrack = (event) => {
             if (remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
         };
 
         pc.onicecandidate = (event) => {
-            if (event.candidate) {
+            if (event.candidate && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'ice', data: event.candidate }));
             }
         };
 
         pc.onconnectionstatechange = () => setConnectionState(pc.connectionState);
 
+        // --- ORCHESTRATION ---
+        const maybeStartCall = async () => {
+            if (isCaller && localMediaReady && peerConnected && !offerSent) {
+                offerSent = true; // Empêche l'envoi en boucle
+                try {
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    ws.send(JSON.stringify({ type: 'offer', data: offer }));
+                } catch (e) {
+                    console.error("Erreur lors de la création de l'offre:", e);
+                }
+            }
+        };
+
+        // Envoi régulier d'un ping tant que l'autre n'a pas répondu ou que l'offre n'est pas envoyée
+        const pingInterval = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN && !offerSent && pc.signalingState === 'stable') {
+                ws.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, 1500);
+
         ws.onmessage = async (event) => {
             const { type, data } = JSON.parse(event.data);
-            if (type === 'offer') {
-                await pc.setRemoteDescription(new RTCSessionDescription(data));
-                const answer = await pc.createAnswer();
-                await pc.setLocalDescription(answer);
-                ws.send(JSON.stringify({ type: 'answer', data: answer }));
+            
+            if (type === 'ping') {
+                ws.send(JSON.stringify({ type: 'pong' }));
+                peerConnected = true;
+                maybeStartCall();
+            } else if (type === 'pong') {
+                peerConnected = true;
+                maybeStartCall();
+            } else if (type === 'offer') {
+                try {
+                    await pc.setRemoteDescription(new RTCSessionDescription(data));
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    ws.send(JSON.stringify({ type: 'answer', data: answer }));
+                } catch (e) {
+                    console.error("Error handling offer:", e);
+                }
             } else if (type === 'answer') {
-                await pc.setRemoteDescription(new RTCSessionDescription(data));
+                try {
+                    await pc.setRemoteDescription(new RTCSessionDescription(data));
+                } catch (e) {
+                    console.error("Error handling answer:", e);
+                }
             } else if (type === 'ice') {
-                await pc.addIceCandidate(new RTCIceCandidate(data));
+                try {
+                    await pc.addIceCandidate(new RTCIceCandidate(data));
+                } catch (e) {
+                    console.error("Error adding ice candidate:", e);
+                }
             } else if (type === 'hangup') {
                 pc.close();
                 setConnectionState('disconnected');
             }
         };
 
-        ws.onopen = async () => {
-            if (isCaller) {
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                ws.send(JSON.stringify({ type: 'offer', data: offer }));
+        // Initialisation de la caméra/micro avant toute communication
+        const initMedia = async () => {
+            try {
+                let stream: MediaStream;
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                } catch (err) {
+                    console.warn("Caméra indisponible, tentative audio unique...", err);
+                    stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                    setIsCamOn(false);
+                    setTimeout(() => alert("Appel en AUDIO uniquement (caméra bloquée par une autre application)."), 1000);
+                }
+
+                if (!isMounted) {
+                    stream.getTracks().forEach(t => t.stop());
+                    return;
+                }
+
+                localStreamRef.current = stream;
+                if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+                
+                // Ajout des pistes au PeerConnection
+                stream.getTracks().forEach(track => pc.addTrack(track, stream));
+                
+                localMediaReady = true;
+                maybeStartCall();
+
+            } catch (criticalErr) {
+                console.error("Erreur critique d'accès aux médias", criticalErr);
+                setTimeout(() => alert("Impossible d'accéder au micro. Veuillez vérifier vos permissions."), 1000);
             }
         };
 
+        initMedia();
+
         return () => {
+            isMounted = false;
+            clearInterval(pingInterval);
             ws.close();
             pc.close();
             localStreamRef.current?.getTracks().forEach(t => t.stop());
@@ -97,9 +171,14 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
     }, []);
 
     const hangUp = useCallback(() => {
-        wsRef.current?.send(JSON.stringify({ type: 'hangup', data: {} }));
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'hangup', data: {} }));
+        }
         pcRef.current?.close();
-        wsRef.current?.close();
+        
+        // Bug VID-3 fix : Timeout pour laisser le message 'hangup' partir
+        setTimeout(() => wsRef.current?.close(), 300);
+        
         localStreamRef.current?.getTracks().forEach(t => t.stop());
     }, []);
 

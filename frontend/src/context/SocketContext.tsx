@@ -29,12 +29,16 @@ export function SocketProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        // On utilise l'URL absolue ou relative selon l'env
+        // Bug B2 fix : ne jamais hardcoder le port backend
         let wsUrl = import.meta.env.VITE_WS_URL;
         if (!wsUrl) {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const host = window.location.host.includes('localhost') ? 'localhost:8000' : window.location.host;
-            wsUrl = `${protocol}//${host}/ws`;
+            // En dev/prod via Nginx, le proxy redirige /ws/ → backend:8000
+            // On utilise le même host que le frontend (Nginx gère le proxy)
+            wsUrl = `${protocol}//${window.location.host}/ws`;
+            if (import.meta.env.DEV) {
+                console.warn('[WS] VITE_WS_URL non défini — utilisation du fallback:', wsUrl);
+            }
         }
         
         const ws = new WebSocket(`${wsUrl}/queue/?token=${token}`);

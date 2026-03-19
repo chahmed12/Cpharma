@@ -57,15 +57,39 @@ class QueueConsumer(AsyncWebsocketConsumer):
             }
         }))
 
+    async def prescription_ready(self, event):
+        """Notifie le pharmacien que l'ordonnance est prête et signée."""
+        await self.send(text_data=json.dumps({
+            'type': 'prescription_ready',
+            'payload': {'hash': event['hash']}
+        }))
+
 
 class WebRTCConsumer(AsyncWebsocketConsumer):
     """
     Signaling WebRTC (Offer/Answer/ICE) pour une consultation spécifique.
     """
     async def connect(self):
+        user = self.scope['user']
+        if user.is_anonymous:
+            await self.close()
+            return
+
         self.consultation_id = self.scope['url_route']['kwargs']['id']
-        self.room            = f'webrtc_room_{self.consultation_id}'
-        
+
+        # Bug VID-1 fix : Vérifier que l'utilisateur est bien autorisé pour cette consultation
+        from .models import Consultation
+        from channels.db import database_sync_to_async
+        try:
+            consult = await database_sync_to_async(Consultation.objects.get)(pk=self.consultation_id)
+            if user.id not in (consult.medecin_id, consult.pharmacien_id):
+                await self.close()
+                return
+        except Consultation.DoesNotExist:
+            await self.close()
+            return
+
+        self.room = f'webrtc_room_{self.consultation_id}'
         await self.channel_layer.group_add(self.room, self.channel_name)
         await self.accept()
 

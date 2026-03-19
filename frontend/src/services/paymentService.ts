@@ -48,16 +48,4 @@ export async function getDoctorRevenues(): Promise<RevenusData> {
     return data;
 }
 
-// Télécharge le reçu PDF d'un paiement
-export async function downloadRecu(paymentId: number) {
-    const response = await api.get(
-        `/payments/${paymentId}/recu/`,
-        { responseType: 'blob' }
-    );
-    const url = URL.createObjectURL(response.data);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `recu_${paymentId}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
+// Note: le téléchargement du reçu est géré côté client via @react-pdf/renderer dans ConfirmationFin.tsx

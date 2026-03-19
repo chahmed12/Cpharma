@@ -14,6 +14,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = ['email', 'password', 'nom', 'prenom', 'role',
                   'specialite', 'numero_ordre', 'nom_pharmacie']
 
+    def validate_role(self, value):
+        """Bug C3 fix : empêche la création de comptes ADMIN via l'API publique."""
+        if value not in ('MEDECIN', 'PHARMACIEN'):
+            raise serializers.ValidationError(
+                "Rôle invalide. Les valeurs acceptées sont : MEDECIN, PHARMACIEN."
+            )
+        return value
+
     def create(self, validated):
         specialite    = validated.pop('specialite',    '')
         numero_ordre  = validated.pop('numero_ordre',  '')

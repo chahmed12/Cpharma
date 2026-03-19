@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAvailableDoctors, type Doctor }
     from '../services/medecinService';
-import { getQueue, type Consultation }
+import { getHistory, type Consultation }
     from '../services/consultationService';
 import { useSocket } from '../hooks/useSocket';
 import { Navbar } from '../components/ui/Navbar';
@@ -85,9 +85,22 @@ function DoctorCard({ doc, index, onStart }: {
             <p style={{
                 fontSize: '13px',
                 color: 'var(--text-muted)',
-                marginBottom: '16px',
+                marginBottom: '8px',
             }}>
                 {doc.specialite}
+            </p>
+            {/* Bug B4 fix : afficher le tarif pour informer le patient */}
+            <p style={{
+                fontSize: '12px',
+                fontWeight: '700',
+                color: 'var(--green-700)',
+                background: 'var(--green-50)',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                display: 'inline-block',
+                marginBottom: '16px',
+            }}>
+                {doc.tarif_consultation ? `${doc.tarif_consultation} DA / consultation` : 'Tarif non défini'}
             </p>
 
             {/* Bouton action */}
@@ -118,11 +131,22 @@ export default function PharmacistDashboard() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        Promise.all([getAvailableDoctors(), getQueue()]).then(([d, h]) => {
+        Promise.all([getAvailableDoctors(), getHistory()]).then(([d, h]) => {
             setDoctors(d);
-            setHistory(h);
+            // Bug #11 : n'afficher que les consultations terminées / annulées
+            setHistory(h.filter((c: Consultation) =>
+                c.status === 'COMPLETED' || c.status === 'CANCELLED'
+            ));
         }).finally(() => setLoading(false));
     }, []);
+
+    // Redirection automatique quand l'ordonnance est prête
+    useSocket('prescription_ready', (data: any) => {
+        if (data.hash) {
+            navigate(`/pharmacist/verify/${data.hash}`);
+        }
+    });
+
     // ecouter les changements de statut des médecins
     useSocket('doctor_status_changed', (data) => {
         const { doctor_id, status } = data as any;
@@ -167,34 +191,21 @@ export default function PharmacistDashboard() {
                 <section style={{ marginBottom: '48px' }}>
                     <p className="section-title">Médecins disponibles</p>
 
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                        gap: '14px',
-                    }}>
-                        {loading
-                            ? [1, 2, 3].map(i => <SkeletonCard key={i} />)
-                            : doctors.length === 0
-                                ? (
-                                    <div className="card-flat" style={{
-                                        padding: '48px', textAlign: 'center',
-                                        gridColumn: '1 / -1',
-                                    }}>
-                                        <p style={{ fontSize: '36px', marginBottom: '10px' }}>🩺</p>
-                                        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-                                            Aucun médecin enregistré pour le moment
-                                        </p>
-                                    </div>
-                                )
-                                : doctors.map((doc, i) => (
-                                    <DoctorCard
-                                        key={doc.id}
-                                        doc={doc}
-                                        index={i}
-                                        onStart={startConsultation}
-                                    />
-                                ))
-                        }
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '14px' }}>
+                        {loading ? (
+                            <div key="docs-loading" style={{ display: 'contents' }}>
+                                {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+                            </div>
+                        ) : doctors.length === 0 ? (
+                            <div key="docs-empty" className="card-flat" style={{ padding: '48px', textAlign: 'center', gridColumn: '1 / -1' }}>
+                                <p style={{ fontSize: '36px', marginBottom: '10px' }}>🩺</p>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Aucun médecin enregistré pour le moment</p>
+                            </div>
+                        ) : (
+                            <div key="docs-loaded" style={{ display: 'contents' }}>
+                                {doctors.map((doc, i) => <DoctorCard key={doc.id} doc={doc} index={i} onStart={startConsultation} />)}
+                            </div>
+                        )}
                     </div>
                 </section>
 

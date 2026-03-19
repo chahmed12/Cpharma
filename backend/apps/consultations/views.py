@@ -14,15 +14,17 @@ class ConsultationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        # Les médecins voient leurs consultations en attente
+        # Les médecins et pharmaciens voient l'historique de toutes leurs consultations
         if user.role == 'MEDECIN':
-            return Consultation.objects.filter(medecin=user, status='PENDING')
-        # Les pharmaciens voient toutes les consultations qu'ils ont initiées
+            return Consultation.objects.filter(medecin=user)
         return Consultation.objects.filter(pharmacien=user)
 
     def perform_create(self, serializer):
-        # Récupérer l'ID du patient envoyé par le front
         patient_id = self.request.data.get('patient_id')
+        # Bug A1 fix: patient_id obligatoire pour éviter consultation.patient==None
+        if not patient_id:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'patient_id': 'Ce champ est obligatoire.'})
         consultation = serializer.save(
             pharmacien=self.request.user,
             patient_id=patient_id
@@ -44,9 +46,18 @@ class ConsultationViewSet(viewsets.ModelViewSet):
         
         if new_status not in dict(Consultation.Status.choices):
             return Response({'error': 'Statut invalide'}, status=400)
-            
-        consultation.status = new_status
-        consultation.save()
+        from django.db import transaction
+
+        # Bug PAY-1 fix : Transaction atomique pour garantir la cohérence
+        with transaction.atomic():
+            consultation.status = new_status
+            consultation.save()
+
+            # Si la consultation est terminée, créer automatiquement le paiement
+            if new_status == 'COMPLETED':
+                from apps.payments.models import Payment
+                if not Payment.objects.filter(consultation=consultation).exists():
+                    Payment.create_for_consultation(consultation)
 
         # Si la consultation devient active, on prévient le pharmacien
         if new_status == 'ACTIVE':
@@ -57,6 +68,7 @@ class ConsultationViewSet(viewsets.ModelViewSet):
                     'consultation_id': consultation.id,
                 }
             )
+
         return Response(ConsultationSerializer(consultation).data)
 
     @action(detail=False, methods=['get'], url_path='queue')

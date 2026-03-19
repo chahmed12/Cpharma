@@ -7,17 +7,21 @@ import {
     type Payment
 } from '../services/paymentService';
 import { RecuPDF } from '../components/prescription/RecuPDF';
+import { Navbar } from '../components/ui/Navbar';
+import { Spinner } from '../components/ui/Spinner';
 
 export default function ConfirmationFin() {
-    const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
-    const [payment, setPayment] = useState<Payment | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { id }     = useParams<{ id: string }>();
+    const navigate   = useNavigate();
+    const [payment, setPayment]     = useState<Payment | null>(null);
+    const [loading, setLoading]     = useState(true);
     const [confirmed, setConfirmed] = useState(false);
+    const [loadErr, setLoadErr]     = useState('');
 
     useEffect(() => {
         getPaymentByConsultation(Number(id))
             .then(setPayment)
+            .catch(() => setLoadErr('Impossible de charger les données de paiement.'))
             .finally(() => setLoading(false));
     }, [id]);
 
@@ -27,57 +31,89 @@ export default function ConfirmationFin() {
         setPayment(updated);
         setConfirmed(true);
 
-        // Génère et télécharge le reçu automatiquement
+        // Génère et télécharge le reçu PDF
         const blob = await pdf(<RecuPDF payment={updated} />).toBlob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
         a.download = `recu_consultation_${id}.pdf`;
         a.click();
         URL.revokeObjectURL(url);
     };
 
-    if (loading) return <div className="p-8 text-center">Chargement...</div>;
-    if (!payment) return null;
+    if (loading) return <Spinner center dark size="lg" label="Chargement du paiement..." />;
+
+    if (loadErr || !payment) return (
+        <div className="page-wrapper">
+            <Navbar />
+            <div className="page-content-narrow" style={{ paddingTop: '48px', textAlign: 'center' }}>
+                <p style={{ fontSize: '36px', marginBottom: '12px' }}>⚠️</p>
+                <p style={{ fontWeight: '600', marginBottom: '8px' }}>
+                    {loadErr || 'Paiement introuvable.'}
+                </p>
+                <button className="btn btn-secondary" onClick={() => navigate('/pharmacist/dashboard')}>
+                    Retour au tableau de bord
+                </button>
+            </div>
+        </div>
+    );
 
     return (
-        <div className="max-w-lg mx-auto p-6">
-            <h1 className="text-2xl font-bold mb-2">Consultation terminée</h1>
-            <p className="text-gray-500 mb-6">Patient : {payment.patient_nom}</p>
+        <div className="page-wrapper">
+            <Navbar />
+            <div className="page-content-narrow">
 
-            {/* Carte paiement */}
-            <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 mb-6">
-                <p className="text-sm text-green-700 font-semibold mb-1">
-                    Montant à collecter auprès du patient
-                </p>
-                <p className="text-4xl font-bold text-green-800">
-                    {payment.montant_total} DA
-                </p>
-                <p className="text-xs text-green-600 mt-2">
-                    Dont {payment.honoraires_medecin} DA reversés à Dr. {payment.medecin_nom}
-                </p>
-            </div>
-
-            {!confirmed ? (
-                <button
-                    onClick={handleConfirm}
-                    className="w-full bg-green-600 text-white py-3 rounded-xl font-bold text-lg hover:bg-green-700"
-                >
-                    ✓ Confirmer le paiement en espèces
-                </button>
-            ) : (
-                <div className="text-center">
-                    <p className="text-green-600 font-bold text-xl mb-4">
-                        ✅ Paiement confirmé — Reçu téléchargé
+                <div className="animate-fade-up" style={{ marginBottom: '28px' }}>
+                    <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: '700', marginBottom: '4px' }}>
+                        Consultation terminée
+                    </h1>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+                        Patient : <strong>{payment.patient_nom}</strong>
                     </p>
-                    <button
-                        onClick={() => navigate('/pharmacist/dashboard')}
-                        className="text-blue-600 underline"
-                    >
-                        Retour au tableau de bord
-                    </button>
                 </div>
-            )}
+
+                {/* Carte montant */}
+                <div style={{
+                    background: 'var(--green-50)',
+                    border: '2px solid var(--green-100)',
+                    borderRadius: 'var(--radius-lg)',
+                    padding: '28px 24px',
+                    marginBottom: '24px',
+                    textAlign: 'center',
+                }}>
+                    <p style={{ fontSize: '12px', fontWeight: '700', color: 'var(--green-700)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
+                        Montant à collecter auprès du patient
+                    </p>
+                    <p style={{ fontSize: '42px', fontWeight: '800', color: 'var(--green-800)', lineHeight: '1' }}>
+                        {payment.montant_total} <span style={{ fontSize: '20px' }}>DA</span>
+                    </p>
+                    <p style={{ fontSize: '13px', color: 'var(--green-600)', marginTop: '10px' }}>
+                        Dont <strong>{payment.honoraires_medecin} DA</strong> reversés à Dr. {payment.medecin_nom}
+                    </p>
+                </div>
+
+                {!confirmed ? (
+                    <button
+                        className="btn btn-primary btn-full btn-lg"
+                        style={{ background: 'var(--green-600)', borderColor: 'var(--green-600)' }}
+                        onClick={handleConfirm}
+                    >
+                        ✓ Confirmer le paiement en espèces
+                    </button>
+                ) : (
+                    <div style={{ textAlign: 'center', paddingTop: '12px' }}>
+                        <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--green-600)', marginBottom: '16px' }}>
+                            ✅ Paiement confirmé — Reçu téléchargé
+                        </p>
+                        <button
+                            className="btn btn-secondary"
+                            onClick={() => navigate('/pharmacist/dashboard')}
+                        >
+                            Retour au tableau de bord
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

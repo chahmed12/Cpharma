@@ -3,9 +3,9 @@ from django.db   import models
 from django.conf import settings
 from django.utils import timezone
 
-# Taux de commission plateforme (configurable)
-COMMISSION_RATE = Decimal('0.10')   # 10%
-TARIF_DEFAUT    = Decimal('50.00')  # 50 DA par consultation
+# Bug PAY-2 fix : Taux de commission et tarif configurables via settings (env)
+COMMISSION_RATE = getattr(settings, 'CPHARMA_COMMISSION_RATE', Decimal('0.10'))
+TARIF_DEFAUT    = getattr(settings, 'CPHARMA_TARIF_DEFAUT', Decimal('50.00'))
 
 
 class Payment(models.Model):

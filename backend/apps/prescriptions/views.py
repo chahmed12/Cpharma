@@ -1,4 +1,6 @@
 import json, base64
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from cryptography.hazmat.primitives              import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric    import padding
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
@@ -10,19 +12,22 @@ from .serializers                                 import PrescriptionSerializer
 
 
 def verify_rsa_signature(public_key_b64: str, signature_b64: str, data: dict) -> bool:
-    """Vérifie la signature RSA-PSS avec la clé publique du médecin."""
+    """Vérifie la signature RSA-PSS avec la clé publique du médecin.
+    L'algorithme correspond au Web Crypto API: RSA-PSS avec SHA-256 et saltLength=32.
+    """
     try:
         pub_bytes  = base64.b64decode(public_key_b64)
         public_key: RSAPublicKey = serialization.load_der_public_key(pub_bytes)
 
         sig_bytes  = base64.b64decode(signature_b64)
-        msg_bytes  = json.dumps(data, separators=(',', ':')).encode()
+        # Réplication exacte du JSON.stringify(canonicalData) de JavaScript
+        msg_bytes  = json.dumps(data, separators=(',', ':'), sort_keys=True, ensure_ascii=False).encode('utf-8')
 
         public_key.verify(
             sig_bytes, msg_bytes,
             padding.PSS(
                 mgf=padding.MGF1(hashes.SHA256()),
-                salt_length=32
+                salt_length=32              # Correspond à saltLength: 32 côté Web Crypto
             ),
             hashes.SHA256()
         )
@@ -49,16 +54,38 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         medecin        = request.user
         public_key_b64 = medecin.doctorprofile.public_key
 
+        # Bug ORD-2 fix : Rejeter strictement si la clé publique n'est pas configurée
+        if not public_key_b64:
+            return Response({'detail': 'Clé publique PKI absente. Veuillez vous reconnecter pour générer vos clés.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
         # Vérification PKI côté backend (non-répudiation)
         is_valid = verify_rsa_signature(public_key_b64, signature, ordonnance_data)
+        
+        # Bug ORD-1 fix : Ne JAMAIS enregistrer une ordonnance invalide
+        if not is_valid:
+            return Response({'detail': 'Signature RSA-PSS invalide. Ordonnance rejetée pour non-conformité.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        
+        consultation_id = ordonnance_data.get('consultation_id')
 
         prescription = Prescription.objects.create(
+            consultation_id=consultation_id,
             medecin=medecin,
             ordonnance_data=ordonnance_data,
             signature=signature,
             sha256_hash=sha256_hash,
             is_valid=is_valid,
             pdf=pdf_file,
+        )
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f'pharmacien_{prescription.consultation.pharmacien_id}',
+            {
+                'type': 'prescription_ready',
+                'hash': sha256_hash,
+            }
         )
 
         return Response(

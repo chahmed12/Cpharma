@@ -109,7 +109,14 @@ export default function PrescriptionForm() {
                             <div>
                                 <p style={{ fontSize: '11px', color: 'var(--blue-600)', fontWeight: '700', textTransform: 'uppercase' }}>Âge</p>
                                 <p style={{ fontWeight: '600', color: 'var(--blue-800)' }}>
-                                    {new Date().getFullYear() - new Date(patient.date_naissance).getFullYear()} ans
+                                {/* Bug B7 fix : calcul d'âge correct (mois/jour inclus) */}
+                                {(() => {
+                                    const b = new Date(patient.date_naissance);
+                                    const n = new Date();
+                                    let age = n.getFullYear() - b.getFullYear();
+                                    if (n < new Date(n.getFullYear(), b.getMonth(), b.getDate())) age--;
+                                    return <>{age} ans</>;
+                                })()}
                                 </p>
                             </div>
                         </div>

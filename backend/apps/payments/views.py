@@ -38,10 +38,21 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=['patch'], url_path='confirm')
     def confirm(self, request, pk=None):
         """Pharmacien confirme la réception du paiement en espèces."""
+        if request.user.role != 'PHARMACIEN':
+            return Response(
+                {'detail': 'Seul le pharmacien peut confirmer un paiement.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         payment         = self.get_object()
         payment.status  = Payment.Status.PAID
         payment.paid_at = timezone.now()
         payment.save()
+        
+        # Bug ORD-4 fix : Marquer l'ordonnance comme définitivement délivrée
+        if hasattr(payment.consultation, 'prescription'):
+            payment.consultation.prescription.is_dispensed = True
+            payment.consultation.prescription.save()
+            
         return Response(PaymentSerializer(payment).data)
 
     @action(detail=False, methods=['get'], url_path='revenus')

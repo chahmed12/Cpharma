@@ -9,6 +9,7 @@ import Register from './pages/auth/Register';
 import PharmacistDashboard from './pages/PharmacistDashboard';
 import NewConsultation from './pages/NewConsultation';
 import SalleAttente from './pages/SalleAttente';
+import WaitingPrescription from './pages/WaitingPrescription';
 import PrescriptionVerification from './pages/PrescriptionVerification';
 import ConfirmationFin from './pages/ConfirmationFin';
 
@@ -37,6 +38,9 @@ export default function App() {
         />
         <Route path="/pharmacist/waiting/:id"
           element={<ProtectedRoute role="PHARMACIEN"><SalleAttente /></ProtectedRoute>}
+        />
+        <Route path="/pharmacist/waiting-prescription/:id"
+          element={<ProtectedRoute role="PHARMACIEN"><WaitingPrescription /></ProtectedRoute>}
         />
         <Route path="/pharmacist/verify/:hash"
           element={<ProtectedRoute role="PHARMACIEN"><PrescriptionVerification /></ProtectedRoute>}

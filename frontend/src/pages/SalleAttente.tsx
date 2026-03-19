@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
+import { Spinner } from '../components/ui/Spinner';
 
 export default function SalleAttente() {
     const navigate = useNavigate();
@@ -16,6 +17,25 @@ export default function SalleAttente() {
         return () => clearInterval(t);
     }, []);
 
+    // Vérification initiale + polling toutes les 3s (fallback si le WS est coupé)
+    useEffect(() => {
+        if (!consultationId) return;
+
+        const checkStatus = () => {
+            import('../services/consultationService').then(({ getConsultation }) => {
+                getConsultation(consultationId).then(c => {
+                    if (c.status === 'ACTIVE') {
+                        navigate(`/pharmacist/video/${consultationId}`);
+                    }
+                }).catch(console.error);
+            });
+        };
+
+        checkStatus();                             // check immédiat au montage
+        const interval = setInterval(checkStatus, 3000);
+        return () => clearInterval(interval);
+    }, [consultationId, navigate]);
+
     // Écoute l'acceptation via WebSocket
     useSocket('consultation_accepted', (data) => {
         const payload = data as { consultation_id: number };
@@ -26,7 +46,7 @@ export default function SalleAttente() {
     });
 
     if (!consultationId) {
-        return <div className="p-8 text-center">ID de consultation invalide</div>;
+        return <div style={{ padding: '32px', textAlign: 'center' }}>ID de consultation invalide</div>;
     }
 
     return (
@@ -35,7 +55,7 @@ export default function SalleAttente() {
             alignItems: 'center', justifyContent: 'center',
             height: '100vh', gap: '24px', textAlign: 'center'
         }}>
-            <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin" />
+            <Spinner dark size="lg" />
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '24px' }}>
                 En attente du médecin{dots}
             </h2>

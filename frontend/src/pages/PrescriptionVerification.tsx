@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { verifyPrescription } from '../services/prescriptionService';
+import { verifySignature } from '../services/cryptoService';
 import { Navbar } from '../components/ui/Navbar';
 import { Spinner } from '../components/ui/Spinner';
 
@@ -12,18 +13,32 @@ export default function PrescriptionVerification() {
     const [confirming, setConfirming] = useState(false);
 
     useEffect(() => {
-        if (hash)
+        if (hash) {
             verifyPrescription(hash)
-                .then(data => {
+                .then(async data => {
+                    // Bug ORD-3 fix : Re-vérifier la signature cryptographique LOCALEMENT au lieu de faire confiance aveuglément au backend
+                    const isValidLocally = await verifySignature(
+                        data.medecin_public_key,
+                        data.signature,
+                        data.ordonnance_data
+                    );
+
+                    if (!isValidLocally) {
+                        setStatus('invalid');
+                        return;
+                    }
+                    
                     setPrescription(data);
                     setStatus('valid');
                 })
                 .catch(() => setStatus('invalid'));
+        }
     }, [hash]);
 
     const handleConfirm = async () => {
         setConfirming(true);
-        navigate(`/pharmacist/confirm/${prescription?.consultation_id}`);
+        const consultationId = prescription?.ordonnance_data?.consultation_id;
+        navigate(`/pharmacist/confirm/${consultationId}`);
     };
 
     return (
@@ -112,13 +127,17 @@ export default function PrescriptionVerification() {
                                     borderBottom: '1px solid var(--border)',
                                 }}>
                                     <div>
-                                        <p style={{ fontWeight: '700', fontSize: '14px' }}>{prescription.medecin_nom}</p>
-                                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Patient : {prescription.patient_nom}</p>
+                                        <p style={{ fontWeight: '700', fontSize: '14px' }}>
+                                            {prescription.ordonnance_data?.medecin_nom}
+                                        </p>
+                                        <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                            Patient : {prescription.ordonnance_data?.patient?.nom} {prescription.ordonnance_data?.patient?.prenom}
+                                        </p>
                                     </div>
                                     <span className="badge badge-paid">Signée</span>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {prescription.medicaments?.map((m: any, i: number) => (
+                                    {prescription.ordonnance_data?.medicaments?.map((m: any, i: number) => (
                                         <div key={i} style={{
                                             padding: '10px 12px',
                                             background: 'var(--bg-subtle)',

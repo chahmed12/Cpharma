@@ -1,29 +1,41 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { submitPrescription } from '../services/prescriptionService';
-import { signData, getSHA256Hash } from '../services/cryptoService';
+import { loadOrGenerateKeyPair, signData, getSHA256Hash } from '../services/cryptoService';
 import { Navbar } from '../components/ui/Navbar';
 import { Spinner } from '../components/ui/Spinner';
 import { pdf } from '@react-pdf/renderer';
 import { OrdonnancePDF } from '../components/prescription/OrdonnancePDF';
+import api from '../services/api';
 
 export default function SignatureOrdonnance() {
     const location = useLocation();
     const navigate = useNavigate();
     const data = location.state as any;
-    const [status, setStatus] = useState<'idle' | 'signing' | 'done' | 'error'>('idle');
+    const [status, setStatus] = useState<'idle' | 'loading-key' | 'signing' | 'done' | 'error'>('loading-key');
     const [keyPair, setKeyPair] = useState<CryptoKeyPair | null>(null);
+    const [keyError, setKeyError] = useState('');
 
     useEffect(() => {
         if (!data) {
             navigate('/doctor/dashboard');
             return;
         }
-        // Simulation de récupération de clé (en réel : IndexedDB)
-        window.crypto.subtle.generateKey(
-            { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
-            true, ["sign", "verify"]
-        ).then(setKeyPair);
+        // Charger la clé depuis IndexedDB (ou la générer si première fois)
+        loadOrGenerateKeyPair().then(async ({ keyPair: kp, publicKeyB64 }) => {
+            setKeyPair(kp);
+            // Toujours uploader ou rafraîchir la clé publique sur le backend (évite désync IndexedDB vs Backend DB)
+            try {
+                await api.patch('/doctors/public-key/', { public_key: publicKeyB64 });
+            } catch (e) {
+                console.warn("Impossible d'uploader la clé publique:", e);
+            }
+            setStatus('idle');
+        }).catch(e => {
+            console.error("Erreur chargement clé PKI:", e);
+            setKeyError("Impossible de charger la clé de signature. Réessayez.");
+            setStatus('error');
+        });
     }, [data, navigate]);
 
     const handleSign = async () => {
@@ -60,30 +72,51 @@ export default function SignatureOrdonnance() {
 
     if (!data) return null;
 
+    const isLoading = status === 'loading-key';
+    const isSigning = status === 'signing';
+    const isDone    = status === 'done';
+    const isError   = status === 'error';
+
     return (
         <div className="page-wrapper">
             <Navbar />
             <div className="page-content-narrow">
                 <div className="animate-fade-up" style={{ marginBottom: '24px' }}>
                     <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Signer l'ordonnance</h1>
+                    {isLoading && (
+                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                            🔑 Chargement de la clé de signature...
+                        </p>
+                    )}
                 </div>
 
                 <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
-                    <p><strong>Patient :</strong> {data.patient?.nom}</p>
+                    <p><strong>Patient :</strong> {data.patient?.nom} {data.patient?.prenom}</p>
                     <p><strong>Médecin :</strong> {data.medecin_nom}</p>
                     <hr style={{ margin: '16px 0' }} />
                     <p style={{ fontSize: '14px' }}>{data.medicaments?.length} médicament(s) prescrit(s)</p>
+                    {!isLoading && !isError && (
+                        <p style={{ fontSize: '12px', color: 'var(--green-600)', marginTop: '8px' }}>
+                            ✅ Clé RSA chargée — Prêt à signer
+                        </p>
+                    )}
                 </div>
 
+                {keyError && (
+                    <div className="alert alert-error" style={{ marginBottom: '16px' }}>{keyError}</div>
+                )}
+
                 <button
-                    className={`btn btn-full btn-lg ${status === 'done' ? 'btn-success' : 'btn-primary'}`}
+                    className={`btn btn-full btn-lg ${isDone ? 'btn-success' : 'btn-primary'}`}
                     onClick={handleSign}
-                    disabled={status === 'signing' || status === 'done' || !keyPair}
+                    disabled={isSigning || isDone || isLoading || isError}
                 >
-                    {status === 'signing' ? <Spinner size="sm" /> : '🔐 Signer numériquement'}
-                    {status === 'done' && ' ✓ Signé'}
+                    {isLoading && <><Spinner size="sm" /> Chargement de la clé...</>}
+                    {isSigning && <><Spinner size="sm" /> Signature en cours...</>}
+                    {isDone && '✓ Ordonnance signée — Redirection...'}
+                    {isError && '⛔ Erreur — Rechargez la page'}
+                    {status === 'idle' && '🔐 Signer numériquement'}
                 </button>
-                {status === 'error' && <p style={{ color: 'red', marginTop: '10px' }}>Échec de la signature.</p>}
             </div>
         </div>
     );

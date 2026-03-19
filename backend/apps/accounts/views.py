@@ -46,11 +46,19 @@ def doctors_list(request):
     profiles = DoctorProfile.objects.select_related('user').all()
     return Response(DoctorListSerializer(profiles, many=True).data)
 
-@api_view(['PATCH'])
+@api_view(['GET', 'PATCH'])
 @permission_classes([permissions.IsAuthenticated])
 def update_doctor_status(request):
-    """Médecin met à jour son statut et notifie les pharmaciens."""
-    profile    = request.user.doctorprofile
+    """Médecin récupère ou met à jour son statut et notifie les pharmaciens."""
+    # Bug C1 fix : seul un médecin peut accéder à cet endpoint
+    if request.user.role != 'MEDECIN':
+        return Response({'detail': 'Interdit.'}, status=403)
+
+    profile = request.user.doctorprofile
+
+    if request.method == 'GET':
+        return Response({'status': profile.status})
+
     new_status = request.data.get('status', 'ONLINE')
 
     if new_status not in ('ONLINE', 'OFFLINE', 'BUSY'):

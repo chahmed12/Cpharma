@@ -14,13 +14,18 @@ export interface Consultation {
 }
 
 interface CreatePayload {
-    medecin_id: number;
+    medecin: number;
     patient_id: number;
     motif: string;
 }
 
 export async function createConsultation(payload: CreatePayload): Promise<Consultation> {
     const { data } = await api.post<Consultation>('/consultations/', payload);
+    return data;
+}
+
+export async function getHistory(): Promise<Consultation[]> {
+    const { data } = await api.get<Consultation[]>('/consultations/');
     return data;
 }
 
