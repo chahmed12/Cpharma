@@ -14,9 +14,10 @@ export default function WaitingPrescription() {
     // La redirection se fait exclusivement via le WebSocket 'prescription_ready'.
 
     // Écoute temps-réel — le médecin vient de signer
-    useSocket('prescription_ready', (data: any) => {
-        if (data.hash) {
-            navigate(`/pharmacist/verify/${data.hash}`);
+    useSocket('prescription_ready', (data: unknown) => {
+        const payload = data as { hash?: string };
+        if (payload.hash) {
+            navigate(`/pharmacist/verify/${payload.hash}`);
         }
     });
 

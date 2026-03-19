@@ -1,4 +1,5 @@
 from django.db import models
+from fernet_fields import EncryptedTextField, EncryptedCharField
 
 class Patient(models.Model):
     class Sexe(models.TextChoices):
@@ -18,9 +19,9 @@ class Patient(models.Model):
 
 class MedicalRecord(models.Model):
     patient            = models.OneToOneField(Patient, on_delete=models.CASCADE, related_name='medical_record')
-    allergies          = models.TextField(blank=True, help_text="Ex: Pénicilline, Aspirine...")
-    antecedents        = models.TextField(blank=True, help_text="Maladies chroniques, opérations...")
-    groupe_sanguin     = models.CharField(max_length=5, blank=True)
+    allergies          = EncryptedTextField(blank=True, help_text="Ex: Pénicilline, Aspirine...")
+    antecedents        = EncryptedTextField(blank=True, help_text="Maladies chroniques, opérations...")
+    groupe_sanguin     = EncryptedCharField(max_length=5, blank=True)
     poids              = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     taille             = models.PositiveIntegerField(null=True, blank=True) # en cm
     derniere_mise_a_jour = models.DateTimeField(auto_now=True)

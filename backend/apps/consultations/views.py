@@ -14,16 +14,22 @@ class ConsultationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        if user.role == 'ADMIN':
+            return Consultation.objects.all()
         # Les médecins et pharmaciens voient l'historique de toutes leurs consultations
         if user.role == 'MEDECIN':
             return Consultation.objects.filter(medecin=user)
         return Consultation.objects.filter(pharmacien=user)
 
     def perform_create(self, serializer):
+        from rest_framework.exceptions import PermissionDenied, ValidationError
+
+        if self.request.user.role != 'PHARMACIEN':
+            raise PermissionDenied("Seul un pharmacien peut créer une consultation.")
+
         patient_id = self.request.data.get('patient_id')
         # Bug A1 fix: patient_id obligatoire pour éviter consultation.patient==None
         if not patient_id:
-            from rest_framework.exceptions import ValidationError
             raise ValidationError({'patient_id': 'Ce champ est obligatoire.'})
         consultation = serializer.save(
             pharmacien=self.request.user,
@@ -52,12 +58,6 @@ class ConsultationViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             consultation.status = new_status
             consultation.save()
-
-            # Si la consultation est terminée, créer automatiquement le paiement
-            if new_status == 'COMPLETED':
-                from apps.payments.models import Payment
-                if not Payment.objects.filter(consultation=consultation).exists():
-                    Payment.create_for_consultation(consultation)
 
         # Si la consultation devient active, on prévient le pharmacien
         if new_status == 'ACTIVE':

@@ -7,6 +7,7 @@ from channels.layers           import get_channel_layer
 from asgiref.sync              import async_to_sync
 from .models                    import CustomUser, DoctorProfile
 from .serializers               import RegisterSerializer, UserSerializer, DoctorListSerializer
+from apps.core.audit            import log_action
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
@@ -26,6 +27,8 @@ def login(request):
 
     if not user:
         return Response({'detail': 'Email ou mot de passe incorrect'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+    log_action(user, 'USER_LOGIN', f"Connexion réussie")
 
     refresh = RefreshToken.for_user(user)
     return Response({

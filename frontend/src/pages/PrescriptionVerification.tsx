@@ -38,6 +38,11 @@ export default function PrescriptionVerification() {
     const handleConfirm = async () => {
         setConfirming(true);
         const consultationId = prescription?.ordonnance_data?.consultation_id;
+        if (!consultationId) {
+            alert("ID de la consultation introuvable. Veuillez recharger la page.");
+            setConfirming(false);
+            return;
+        }
         navigate(`/pharmacist/confirm/${consultationId}`);
     };
 
@@ -137,7 +142,7 @@ export default function PrescriptionVerification() {
                                     <span className="badge badge-paid">Signée</span>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {prescription.ordonnance_data?.medicaments?.map((m: any, i: number) => (
+                                    {prescription.ordonnance_data?.medicaments?.map((m: { nom: string; posologie: string; duree: string }, i: number) => (
                                         <div key={i} style={{
                                             padding: '10px 12px',
                                             background: 'var(--bg-subtle)',

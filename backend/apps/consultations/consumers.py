@@ -28,7 +28,7 @@ class QueueConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, code):
         if hasattr(self, 'group_name'):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
-        if self.user.role == 'PHARMACIEN':
+        if hasattr(self, 'user') and not self.user.is_anonymous and self.user.role == 'PHARMACIEN':
             await self.channel_layer.group_discard('pharmacists_broadcast', self.channel_name)
 
     # ── HANDLERS (Appelés par channel_layer.group_send) ────
@@ -94,7 +94,8 @@ class WebRTCConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
     async def disconnect(self, code):
-        await self.channel_layer.group_discard(self.room, self.channel_name)
+        if hasattr(self, 'room'):
+            await self.channel_layer.group_discard(self.room, self.channel_name)
 
     async def receive(self, text_data):
         """Relaye le message WebRTC à l'autre participant de la room."""

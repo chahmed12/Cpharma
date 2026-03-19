@@ -1,5 +1,5 @@
 // ── src/hooks/useToast.ts ─────────────────────────────
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 export type ToastType = 'success' | 'error' | 'info';
 export interface ToastItem {
@@ -8,15 +8,30 @@ export interface ToastItem {
     type: ToastType;
 }
 
+type ToastListener = (toast: ToastItem) => void;
+const listeners = new Set<ToastListener>();
+
+export const triggerToast = (message: string, type: ToastType = 'info') => {
+    const item = { id: Date.now(), message, type };
+    listeners.forEach(l => l(item));
+};
+
 export function useToast() {
     const [toasts, setToasts] = useState<ToastItem[]>([]);
 
+    useEffect(() => {
+        const handler = (item: ToastItem) => {
+            setToasts(p => [...p, item]);
+            setTimeout(() => {
+                setToasts(p => p.filter(t => t.id !== item.id));
+            }, 3500);
+        };
+        listeners.add(handler);
+        return () => { listeners.delete(handler); };
+    }, []);
+
     const toast = useCallback((message: string, type: ToastType = 'info') => {
-        const id = Date.now();
-        setToasts(p => [...p, { id, message, type }]);
-        setTimeout(() =>
-            setToasts(p => p.filter(t => t.id !== id))
-            , 3500);
+        triggerToast(message, type);
     }, []);
 
     return { toasts, toast };

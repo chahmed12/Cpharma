@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Spinner } from '../../components/ui/Spinner';
+import { useToast } from '../../hooks/useToast';
 
 export default function Login() {
     const { user, login } = useAuth();
     const navigate = useNavigate();
+    const toast = useToast().toast;
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
 
     useEffect(() => {
         if (user)
@@ -23,11 +24,10 @@ export default function Login() {
 
     const handleSubmit = async () => {
         if (!email || !password) {
-            setError('Veuillez remplir tous les champs.');
+            toast('Veuillez remplir tous les champs.', 'error');
             return;
         }
         setLoading(true);
-        setError('');
         try {
             const u = await login(email, password);
             navigate(
@@ -37,7 +37,7 @@ export default function Login() {
                 { replace: true }
             );
         } catch {
-            setError('Email ou mot de passe incorrect.');
+            toast('Email ou mot de passe incorrect.', 'error');
         } finally {
             setLoading(false);
         }
@@ -201,12 +201,6 @@ export default function Login() {
                                 onKeyDown={onEnter}
                             />
                         </div>
-
-                        {error && (
-                            <div className="alert alert-error">
-                                {error}
-                            </div>
-                        )}
 
                         <button
                             className="btn btn-primary btn-full btn-lg"

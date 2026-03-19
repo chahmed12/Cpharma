@@ -12,15 +12,15 @@ export interface Doctor {
 }
 
 // Pharmacien : liste des médecins disponibles (ONLINE)
-export async function getAvailableDoctors(): Promise<Doctor[]> {
-    const { data } = await api.get<Doctor[]>('/doctors/');
+export async function getAvailableDoctors(options?: { signal?: AbortSignal }): Promise<Doctor[]> {
+    const { data } = await api.get<Doctor[]>('/doctors/', options);
     return data;
 }
 
 // src/services/medecinService.ts
 
-export async function getDoctorStatus(): Promise<'ONLINE' | 'OFFLINE' | 'BUSY'> {
-    const { data } = await api.get<{ status: 'ONLINE' | 'OFFLINE' | 'BUSY' }>('/doctors/status/');
+export async function getDoctorStatus(options?: { signal?: AbortSignal }): Promise<'ONLINE' | 'OFFLINE' | 'BUSY'> {
+    const { data } = await api.get<{ status: 'ONLINE' | 'OFFLINE' | 'BUSY' }>('/doctors/status/', options);
     return data.status;
 }
 

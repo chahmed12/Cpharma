@@ -131,19 +131,29 @@ export default function PharmacistDashboard() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        Promise.all([getAvailableDoctors(), getHistory()]).then(([d, h]) => {
+        const controller = new AbortController();
+        const opts = { signal: controller.signal };
+        Promise.all([getAvailableDoctors(opts), getHistory(opts)]).then(([d, h]) => {
             setDoctors(d);
             // Bug #11 : n'afficher que les consultations terminées / annulées
             setHistory(h.filter((c: Consultation) =>
                 c.status === 'COMPLETED' || c.status === 'CANCELLED'
             ));
-        }).finally(() => setLoading(false));
+        })
+        .catch(err => {
+            if (err.name === 'CanceledError') return;
+            console.error(err);
+        })
+        .finally(() => setLoading(false));
+        
+        return () => controller.abort();
     }, []);
 
     // Redirection automatique quand l'ordonnance est prête
-    useSocket('prescription_ready', (data: any) => {
-        if (data.hash) {
-            navigate(`/pharmacist/verify/${data.hash}`);
+    useSocket('prescription_ready', (data: unknown) => {
+        const payload = data as { hash?: string };
+        if (payload.hash) {
+            navigate(`/pharmacist/verify/${payload.hash}`);
         }
     });
 

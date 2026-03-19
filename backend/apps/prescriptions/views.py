@@ -9,7 +9,11 @@ from rest_framework.decorators                    import action
 from rest_framework.response                      import Response
 from .models                                      import Prescription
 from .serializers                                 import PrescriptionSerializer
+from apps.core.audit                              import log_action
 
+
+import logging
+logger = logging.getLogger(__name__)
 
 def verify_rsa_signature(public_key_b64: str, signature_b64: str, data: dict) -> bool:
     """Vérifie la signature RSA-PSS avec la clé publique du médecin.
@@ -32,7 +36,8 @@ def verify_rsa_signature(public_key_b64: str, signature_b64: str, data: dict) ->
             hashes.SHA256()
         )
         return True
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Signature mismatch or decoding error: {e}")
         return False
 
 
@@ -41,7 +46,10 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Prescription.objects.filter(medecin=self.request.user)
+        user = self.request.user
+        if user.role == 'PHARMACIEN':
+            return Prescription.objects.filter(consultation__pharmacien=user)
+        return Prescription.objects.filter(medecin=user)
 
     def create(self, request):
         """Reçoit l'ordonnance, vérifie la signature PKI et enregistre."""
@@ -69,6 +77,19 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         
         consultation_id = ordonnance_data.get('consultation_id')
 
+        # Bug SOL-BUG-2 fix : Verifier que le médecin est propriétaire et consultation ACTIVE
+        from apps.consultations.models import Consultation
+        try:
+            consultation = Consultation.objects.get(id=consultation_id)
+        except Consultation.DoesNotExist:
+            return Response({'detail': 'Consultation non trouvée.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if consultation.medecin_id != medecin.id:
+            return Response({'detail': "Vous n'êtes pas autorisé à prescrire pour cette consultation."}, status=status.HTTP_403_FORBIDDEN)
+
+        if consultation.status != Consultation.Status.ACTIVE:
+            return Response({'detail': "La consultation n'est pas active."}, status=status.HTTP_400_BAD_REQUEST)
+
         prescription = Prescription.objects.create(
             consultation_id=consultation_id,
             medecin=medecin,
@@ -78,6 +99,8 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
             is_valid=is_valid,
             pdf=pdf_file,
         )
+        
+        log_action(medecin, 'PRESCRIPTION_CREATED', f"Ordonnance #{prescription.id} pour consultation #{consultation_id}")
 
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(

@@ -5,6 +5,7 @@ import type { Patient } from '../services/patientService';
 import { useAuth } from '../hooks/useAuth';
 import { Navbar } from '../components/ui/Navbar';
 import { Spinner } from '../components/ui/Spinner';
+import { useToast } from '../hooks/useToast';
 
 export interface Medicament {
     id: string;
@@ -42,21 +43,24 @@ export default function PrescriptionForm() {
     const [meds, setMeds] = useState<Medicament[]>([newMed()]);
     const [instructions, setInstructions] = useState('');
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const toast = useToast().toast;
 
     useEffect(() => {
+        const controller = new AbortController();
         if (id) {
-            getConsultation(Number(id))
+            getConsultation(Number(id), { signal: controller.signal })
                 .then(c => {
                     // On utilise patient_details qui vient du backend
                     setPatient(c.patient_details);
                 })
                 .catch(err => {
+                    if (err.name === 'CanceledError') return;
                     console.error("Erreur chargement consultation:", err);
-                    setError("Impossible de charger les données.");
+                    toast("Impossible de charger les données.", "error");
                 })
                 .finally(() => setLoading(false));
         }
+        return () => controller.abort();
     }, [id]);
 
     const updateMed = (medId: string, field: keyof Medicament, val: string) =>
@@ -68,7 +72,7 @@ export default function PrescriptionForm() {
     const handleNext = () => {
         const filled = meds.filter(m => m.nom.trim());
         if (filled.length === 0) {
-            setError('Ajoutez au moins un médicament.');
+            toast('Ajoutez au moins un médicament.', 'error');
             return;
         }
         if (!patient) return;
@@ -154,7 +158,6 @@ export default function PrescriptionForm() {
                     <textarea className="input" rows={3} placeholder="Ex : Prendre avec de la nourriture..." value={instructions} onChange={e => setInstructions(e.target.value)} />
                 </div>
 
-                {error && <div className="alert alert-error" style={{ marginBottom: '16px' }}>{error}</div>}
                 <button className="btn btn-primary btn-full btn-lg" onClick={handleNext}>Prévisualiser l'ordonnance →</button>
             </div>
         </div>

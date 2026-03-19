@@ -24,10 +24,12 @@ export interface RevenusData {
 
 // Récupère le paiement lié à une consultation
 export async function getPaymentByConsultation(
-    consultationId: number
+    consultationId: number,
+    options?: { signal?: AbortSignal }
 ): Promise<Payment> {
     const { data } = await api.get<Payment>(
-        `/payments/consultation/${consultationId}/`
+        `/payments/consultation/${consultationId}/`,
+        options
     );
     return data;
 }
@@ -43,8 +45,8 @@ export async function confirmPayment(
 }
 
 // Médecin consulte ses revenus (tableau de bord)
-export async function getDoctorRevenues(): Promise<RevenusData> {
-    const { data } = await api.get<RevenusData>('/payments/revenus/');
+export async function getDoctorRevenues(options?: { signal?: AbortSignal }): Promise<RevenusData> {
+    const { data } = await api.get<RevenusData>('/payments/revenus/', options);
     return data;
 }
 

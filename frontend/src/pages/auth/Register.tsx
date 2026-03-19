@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { registerUser } from '../../services/authService';
 import { Spinner } from '../../components/ui/Spinner';
+import { useToast } from '../../hooks/useToast';
 
 type Role = 'MEDECIN' | 'PHARMACIEN';
 
@@ -22,8 +23,8 @@ const ROLES: { id: Role; icon: string; title: string; desc: string }[] = [
 
 export default function Register() {
     const navigate = useNavigate();
+    const toast = useToast().toast;
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
     const [form, setForm] = useState({
         email: '',
         password: '',
@@ -40,12 +41,11 @@ export default function Register() {
 
     const handleSubmit = async () => {
         setLoading(true);
-        setError('');
         try {
             await registerUser(form);
             navigate('/login');
         } catch {
-            setError('Erreur lors de la création du compte.');
+            toast('Erreur lors de la création du compte.', 'error');
         } finally {
             setLoading(false);
         }
@@ -198,13 +198,6 @@ export default function Register() {
                                 placeholder="Pharmacie du Centre"
                                 value={form.nom_pharmacie}
                                 onChange={e => set('nom_pharmacie', e.target.value)} />
-                        </div>
-                    )}
-
-                    {/* Erreur */}
-                    {error && (
-                        <div className="alert alert-error">
-                            {error}
                         </div>
                     )}
 

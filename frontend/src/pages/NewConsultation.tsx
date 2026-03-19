@@ -4,10 +4,12 @@ import { createConsultation } from '../services/consultationService';
 import { searchPatients, createPatient, type Patient } from '../services/patientService';
 import { Navbar } from '../components/ui/Navbar';
 import { Spinner } from '../components/ui/Spinner';
+import { useToast } from '../hooks/useToast';
 
 export default function NewConsultation() {
     const navigate = useNavigate();
     const location = useLocation();
+    const toast = useToast().toast;
     const selectedDoctor = location.state?.selectedDoctor;
 
     useEffect(() => {
@@ -29,7 +31,6 @@ export default function NewConsultation() {
 
     const [motif, setMotif] = useState('');
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
 
     // Recherche temps réel
     useEffect(() => {
@@ -41,8 +42,8 @@ export default function NewConsultation() {
     }, [searchQuery]);
 
     const handleSubmit = async () => {
-        if (!selectedDoctor) return setError("Médecin non sélectionné");
-        if (!motif) return setError("Motif obligatoire");
+        if (!selectedDoctor) return toast("Médecin non sélectionné", "error");
+        if (!motif) return toast("Motif obligatoire", "error");
 
         setLoading(true);
         try {
@@ -56,8 +57,9 @@ export default function NewConsultation() {
                 try {
                     const created = await createPatient(newPatient);
                     patientId = created.id;
-                } catch (apiErr: any) {
-                     const msgStr = apiErr.response?.data ? JSON.stringify(apiErr.response.data).toLowerCase() : "";
+                } catch (apiErr) {
+                     const err = apiErr as { response?: { data?: unknown } };
+                     const msgStr = err.response?.data ? JSON.stringify(err.response.data).toLowerCase() : "";
                      if (msgStr.includes('telephone') || msgStr.includes('existe')) {
                          throw new Error("Un patient avec ce numéro existe déjà. Veuillez décocher 'Nouveau Patient' et le chercher via la barre haut.");
                      }
@@ -74,10 +76,11 @@ export default function NewConsultation() {
             });
 
             navigate(`/pharmacist/waiting/${consultation.id}`);
-        } catch (err: any) {
-            console.error("API Error: ", err);
+        } catch (catchErr) {
+            console.error("API Error: ", catchErr);
+            const err = catchErr as { response?: { data?: unknown }, message?: string };
             const msg = err.response?.data ? JSON.stringify(err.response.data) : err.message;
-            setError("Erreur : " + msg);
+            toast("Erreur : " + msg, "error");
         } finally {
             setLoading(false);
         }
@@ -177,8 +180,6 @@ export default function NewConsultation() {
                         onChange={e => setMotif(e.target.value)}
                     />
                 </div>
-
-                {error && <p style={{ color: 'red', marginBottom: '10px' }}>{error}</p>}
 
                 <button 
                     className="btn btn-primary btn-full btn-lg" 

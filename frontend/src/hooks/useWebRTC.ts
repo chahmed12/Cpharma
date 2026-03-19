@@ -10,6 +10,11 @@ const ICE_SERVERS = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+        ...(import.meta.env.VITE_TURN_URL ? [{
+            urls: import.meta.env.VITE_TURN_URL,
+            username: import.meta.env.VITE_TURN_USERNAME,
+            credential: import.meta.env.VITE_TURN_CREDENTIAL
+        }] : [])
     ],
 };
 
@@ -73,6 +78,9 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
         };
 
         // Envoi régulier d'un ping tant que l'autre n'a pas répondu ou que l'offre n'est pas envoyée
+        // SOL-QC-3 : Le ping/pong est un mécanisme de peer discovery pour détecter quand l'autre
+        // participant rejoint le canal de signaling, distinct du ICE connectivity check qui
+        // intervient après l'échange SDP.
         const pingInterval = setInterval(() => {
             if (ws.readyState === WebSocket.OPEN && !offerSent && pc.signalingState === 'stable') {
                 ws.send(JSON.stringify({ type: 'ping' }));

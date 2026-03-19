@@ -4,6 +4,7 @@ import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { ConsultationProvider } from './context/ConsultationContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -11,7 +12,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <AuthProvider>             {/* ① Auth — JWT, rôle, user */}
       <SocketProvider>           {/* ② WS — file d'attente + signaling */}
         <ConsultationProvider>     {/* ③ État consultation courante */}
-          <App />
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
         </ConsultationProvider>
       </SocketProvider>
     </AuthProvider>

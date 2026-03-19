@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
 # Installation des dépendances Python
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
-RUN pip install daphne  # Garanti pour les WebSockets
+
 
 # Copier le code
 COPY . .

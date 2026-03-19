@@ -73,13 +73,13 @@ export async function loadOrGenerateKeyPair(): Promise<{
     return { keyPair: kp, publicKeyB64, isNew };
 }
 
-function canonicalize(obj: any): any {
+function canonicalize(obj: unknown): unknown {
     if (obj === null || typeof obj !== 'object') return obj;
     if (Array.isArray(obj)) return obj.map(canonicalize);
     const sortedKeys = Object.keys(obj).sort();
-    const result: any = {};
+    const result: Record<string, unknown> = {};
     for (const key of sortedKeys) {
-        result[key] = canonicalize(obj[key]);
+        result[key] = canonicalize((obj as Record<string, unknown>)[key]);
     }
     return result;
 }

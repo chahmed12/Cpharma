@@ -10,13 +10,23 @@ class PatientViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        user = self.request.user
+        if user.role == 'ADMIN':
+            qs = Patient.objects.all()
+        elif user.role == 'PHARMACIEN':
+            qs = Patient.objects.filter(consultations__pharmacien=user).distinct()
+        elif user.role == 'MEDECIN':
+            qs = Patient.objects.filter(consultations__medecin=user).distinct()
+        else:
+            qs = Patient.objects.none()
+
         query = self.request.query_params.get('search', None)
         if query:
-            return Patient.objects.filter(
+            qs = qs.filter(
                 models.Q(nom__icontains=query) | 
                 models.Q(telephone__icontains=query)
             )
-        return Patient.objects.all().order_by('-created_at')
+        return qs.order_by('-created_at')
 
     @action(detail=True, methods=['get'])
     def medical_record(self, request, pk=None):

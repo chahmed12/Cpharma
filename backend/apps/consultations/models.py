@@ -25,8 +25,7 @@ class Consultation(models.Model):
     patient      = models.ForeignKey(
         Patient,
         on_delete=models.CASCADE,
-        related_name='consultations',
-        null=True # null=True temporairement pour la migration si besoin
+        related_name='consultations'
     )
 
     motif        = models.TextField()

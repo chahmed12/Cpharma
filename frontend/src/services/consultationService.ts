@@ -24,13 +24,13 @@ export async function createConsultation(payload: CreatePayload): Promise<Consul
     return data;
 }
 
-export async function getHistory(): Promise<Consultation[]> {
-    const { data } = await api.get<Consultation[]>('/consultations/');
+export async function getHistory(options?: { signal?: AbortSignal }): Promise<Consultation[]> {
+    const { data } = await api.get<Consultation[]>('/consultations/', options);
     return data;
 }
 
-export async function getQueue(): Promise<Consultation[]> {
-    const { data } = await api.get<Consultation[]>('/consultations/queue/');
+export async function getQueue(options?: { signal?: AbortSignal }): Promise<Consultation[]> {
+    const { data } = await api.get<Consultation[]>('/consultations/queue/', options);
     return data;
 }
 
@@ -39,7 +39,7 @@ export async function updateConsultationStatus(id: number, status: ConsultationS
     return data;
 }
 
-export async function getConsultation(id: number): Promise<Consultation> {
-    const { data } = await api.get<Consultation>(`/consultations/${id}/`);
+export async function getConsultation(id: number, options?: { signal?: AbortSignal }): Promise<Consultation> {
+    const { data } = await api.get<Consultation>(`/consultations/${id}/`, options);
     return data;
 }

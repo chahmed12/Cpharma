@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # On attend que la base de données soit disponible sur le réseau Docker
-echo "Attente de la base de données PostgreSQL sur $POSTGRES_HOST:$POSTGRES_PORT..."
-while ! nc -z $POSTGRES_HOST $POSTGRES_PORT; do
+echo "Attente de la base de données PostgreSQL sur ${POSTGRES_HOST}:${POSTGRES_PORT}..."
+while ! nc -z "${POSTGRES_HOST}" "${POSTGRES_PORT}"; do
   sleep 0.1
 done
 echo "PostgreSQL est prêt !"

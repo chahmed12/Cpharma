@@ -1,11 +1,11 @@
 import { createContext, useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
-type EventHandler = (data: any) => void;
+type EventHandler = (data: unknown) => void;
 
 interface SocketContextType {
     isConnected: boolean;
-    send: (type: string, payload: any) => void;
+    send: (type: string, payload: unknown) => void;
     on: (event: string, handler: EventHandler) => void;
     off: (event: string, handler: EventHandler) => void;
 }
@@ -29,40 +29,68 @@ export function SocketProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        // Bug B2 fix : ne jamais hardcoder le port backend
-        let wsUrl = import.meta.env.VITE_WS_URL;
-        if (!wsUrl) {
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            // En dev/prod via Nginx, le proxy redirige /ws/ → backend:8000
-            // On utilise le même host que le frontend (Nginx gère le proxy)
-            wsUrl = `${protocol}//${window.location.host}/ws`;
-            if (import.meta.env.DEV) {
-                console.warn('[WS] VITE_WS_URL non défini — utilisation du fallback:', wsUrl);
-            }
-        }
-        
-        const ws = new WebSocket(`${wsUrl}/queue/?token=${token}`);
-        wsRef.current = ws;
+        let isMounted = true;
+        let reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
+        let attempt = 0;
 
-        ws.onopen = () => setIsConnected(true);
-        ws.onclose = () => setIsConnected(false);
-        ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                const handlers = handlersRef.current.get(data.type);
-                handlers?.forEach(h => h(data.payload));
-            } catch (e) {
-                console.error("Erreur WS:", e);
+        const connect = () => {
+            // Bug B2 fix : ne jamais hardcoder le port backend
+            let wsUrl = import.meta.env.VITE_WS_URL;
+            if (!wsUrl) {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                wsUrl = `${protocol}//${window.location.host}/ws`;
+                if (import.meta.env.DEV) {
+                    console.warn('[WS] VITE_WS_URL non défini — utilisation du fallback:', wsUrl);
+                }
             }
+            
+            const ws = new WebSocket(`${wsUrl}/queue/?token=${token}`);
+            wsRef.current = ws;
+
+            ws.onopen = () => {
+                if (!isMounted) return;
+                setIsConnected(true);
+                attempt = 0; // Réinitialiser le compteur à chaque connexion réussie
+            };
+
+            ws.onclose = () => {
+                if (!isMounted) return;
+                setIsConnected(false);
+                
+                // Backoff exponentiel
+                if (attempt < 10) {
+                    const delay = Math.min(1000 * Math.pow(2, attempt), 30000); // 1s à 30s
+                    attempt++;
+                    reconnectTimeoutId = setTimeout(connect, delay);
+                }
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    const handlers = handlersRef.current.get(data.type);
+                    handlers?.forEach(h => h(data.payload));
+                } catch (e) {
+                    console.error("Erreur WS:", e);
+                }
+            };
         };
 
+        connect();
+
         return () => {
-            ws.close();
+            isMounted = false;
+            if (reconnectTimeoutId) clearTimeout(reconnectTimeoutId);
+            if (wsRef.current) {
+                wsRef.current.onclose = null; // Désactiver la reconnexion au démontage
+                wsRef.current.close();
+                wsRef.current = null;
+            }
         };
     }, [isAuthenticated, token]);
 
     // Fonctions stables avec useCallback
-    const send = useCallback((type: string, payload: any) => {
+    const send = useCallback((type: string, payload: unknown) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({ type, payload }));
         }

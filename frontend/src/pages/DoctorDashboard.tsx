@@ -21,7 +21,9 @@ export default function DoctorDashboard() {
     const [toggling, setToggling] = useState(false);
 
     useEffect(() => {
-        Promise.all([getQueue(), getDoctorStatus(), getHistory(), getDoctorRevenues()])
+        const controller = new AbortController();
+        const opts = { signal: controller.signal };
+        Promise.all([getQueue(opts), getDoctorStatus(opts), getHistory(opts), getDoctorRevenues(opts)])
             .then(([q, s, h, r]) => {
                 setQueue(q);
                 // Bug #11 : n'afficher que les consultations terminées / annulées
@@ -32,8 +34,13 @@ export default function DoctorDashboard() {
                 if (s === 'ONLINE' || s === 'OFFLINE') setMyStatus(s);
                 else if (s === 'BUSY') setMyStatus('OFFLINE');
             })
-            .catch(console.error)
+            .catch(err => {
+                if (err.name === 'CanceledError') return;
+                console.error(err);
+            })
             .finally(() => setLoading(false));
+            
+        return () => controller.abort();
     }, []);
 
     useSocket('new_patient', (data) => {
@@ -60,7 +67,13 @@ export default function DoctorDashboard() {
     const isOnline = myStatus === 'ONLINE';
 
     const getAge = (dateNaissance: string) => {
-        return new Date().getFullYear() - new Date(dateNaissance).getFullYear();
+        const b = new Date(dateNaissance);
+        const n = new Date();
+        let age = n.getFullYear() - b.getFullYear();
+        if (n.getMonth() < b.getMonth() || (n.getMonth() === b.getMonth() && n.getDate() < b.getDate())) {
+            age--;
+        }
+        return age;
     };
 
     return (
@@ -144,7 +157,7 @@ export default function DoctorDashboard() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {loading ? (
                             [1, 2].map(i => (
-                                <div key={i} className="card" style={{ padding: '18px 20px', display: 'flex', gap: '14px', alignItems: 'center' }}>
+                                <div key={i} className="card queue-item">
                                     <div className="skeleton" style={{ width: '44px', height: '44px', flexShrink: 0, borderRadius: '12px' }} />
                                     <div style={{ flex: 1 }}>
                                         <div className="skeleton" style={{ width: '55%', height: '15px', marginBottom: '8px' }} />
@@ -171,7 +184,7 @@ export default function DoctorDashboard() {
                                     }}>
                                         {c.patient_details.sexe === 'F' ? '👩' : '👨'}
                                     </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div className="queue-item-content">
                                         <p style={{ fontWeight: '700', fontSize: '15px', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {c.patient_details.prenom} {c.patient_details.nom}
                                             {c.patient_details.date_naissance && (

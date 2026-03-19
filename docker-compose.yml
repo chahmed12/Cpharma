@@ -18,6 +18,19 @@ services:
   redis:
     image: redis:7-alpine
 
+  # ─── TURN SERVER (WebRTC via NAT restrictif) ─────
+  turn:
+    image: coturn/coturn
+    command: >
+      -n --log-file=stdout
+      --min-port=49152 --max-port=65535
+      --realm=pharma.local
+      --user=cpharma:cpharma_secret
+      --listening-port=3478
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+
   # ─── BACKEND (Django + Daphne) ───────────────────
   backend:
     build: ./backend
@@ -47,6 +60,9 @@ services:
       args:
         - VITE_API_URL=/api
         - VITE_WS_URL=ws://localhost:80/ws
+        - VITE_TURN_URL=turn:localhost:3478
+        - VITE_TURN_USERNAME=cpharma
+        - VITE_TURN_CREDENTIAL=cpharma_secret
     ports:
       - "80:80"
     depends_on:

@@ -9,6 +9,7 @@ import {
 import { RecuPDF } from '../components/prescription/RecuPDF';
 import { Navbar } from '../components/ui/Navbar';
 import { Spinner } from '../components/ui/Spinner';
+import { useToast } from '../hooks/useToast';
 
 export default function ConfirmationFin() {
     const { id }     = useParams<{ id: string }>();
@@ -16,40 +17,51 @@ export default function ConfirmationFin() {
     const [payment, setPayment]     = useState<Payment | null>(null);
     const [loading, setLoading]     = useState(true);
     const [confirmed, setConfirmed] = useState(false);
-    const [loadErr, setLoadErr]     = useState('');
+    const toast = useToast().toast;
 
     useEffect(() => {
-        getPaymentByConsultation(Number(id))
+        const controller = new AbortController();
+        getPaymentByConsultation(Number(id), { signal: controller.signal })
             .then(setPayment)
-            .catch(() => setLoadErr('Impossible de charger les données de paiement.'))
+            .catch(err => {
+                if (err.name === 'CanceledError') return;
+                toast('Impossible de charger les données de paiement.', 'error');
+            })
             .finally(() => setLoading(false));
+            
+        return () => controller.abort();
     }, [id]);
 
     const handleConfirm = async () => {
         if (!payment) return;
-        const updated = await confirmPayment(payment.id);
-        setPayment(updated);
-        setConfirmed(true);
+        try {
+            const updated = await confirmPayment(payment.id);
+            setPayment(updated);
+            setConfirmed(true);
 
-        // Génère et télécharge le reçu PDF
-        const blob = await pdf(<RecuPDF payment={updated} />).toBlob();
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href     = url;
-        a.download = `recu_consultation_${id}.pdf`;
-        a.click();
-        URL.revokeObjectURL(url);
+            // Génère et télécharge le reçu PDF
+            const blob = await pdf(<RecuPDF payment={updated} />).toBlob();
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = `recu_consultation_${id}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            toast("Erreur lors de la confirmation du paiement.", "error");
+        }
     };
+
 
     if (loading) return <Spinner center dark size="lg" label="Chargement du paiement..." />;
 
-    if (loadErr || !payment) return (
+    if (!payment) return (
         <div className="page-wrapper">
             <Navbar />
             <div className="page-content-narrow" style={{ paddingTop: '48px', textAlign: 'center' }}>
                 <p style={{ fontSize: '36px', marginBottom: '12px' }}>⚠️</p>
                 <p style={{ fontWeight: '600', marginBottom: '8px' }}>
-                    {loadErr || 'Paiement introuvable.'}
+                    Paiement introuvable.
                 </p>
                 <button className="btn btn-secondary" onClick={() => navigate('/pharmacist/dashboard')}>
                     Retour au tableau de bord

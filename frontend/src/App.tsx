@@ -19,9 +19,14 @@ import VideoCall from './pages/VideoCall';
 import PrescriptionForm from './pages/PrescriptionForm';
 import SignatureOrdonnance from './pages/SignatureOrdonnance';
 
+import { useToast } from './hooks/useToast';
+import { ToastContainer } from './components/ui/Toast';
+
 export default function App() {
+  const { toasts } = useToast();
   return (
     <BrowserRouter>
+      <ToastContainer toasts={toasts} />
       <Routes>
 
         {/* ── Routes publiques ─────────────────────── */}

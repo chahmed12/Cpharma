@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response   import Response
 from .models                   import Payment
 from .serializers              import PaymentSerializer
+from apps.core.audit           import log_action
 
 
 class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
@@ -44,6 +45,13 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         payment         = self.get_object()
+
+        if payment.consultation.pharmacien_id != request.user.id:
+            return Response(
+                {'detail': 'Vous ne pouvez pas confirmer une consultation qui ne vous est pas assignée.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         payment.status  = Payment.Status.PAID
         payment.paid_at = timezone.now()
         payment.save()
@@ -53,11 +61,18 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
             payment.consultation.prescription.is_dispensed = True
             payment.consultation.prescription.save()
             
+        log_action(request.user, 'PAYMENT_CONFIRMED', f"Paiement #{payment.id} confirmé pour consultation #{payment.consultation_id}")
+            
         return Response(PaymentSerializer(payment).data)
 
     @action(detail=False, methods=['get'], url_path='revenus')
     def revenus(self, request):
         """Médecin consulte ses revenus agrégés + liste des paiements."""
+        if request.user.role != 'MEDECIN':
+            return Response(
+                {'detail': 'Seuls les médecins peuvent consulter les revenus.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         qs = Payment.objects.filter(
             medecin=request.user,
             status=Payment.Status.PAID
