@@ -54,6 +54,7 @@ L'architecture robuste et "Production-Ready" est le fruit d'une ingénierie avan
 | **Backend** | Python, Django, DRF, Channels | API RESTfully, Routage WebSocket asynchrone sécurisé. |
 | **Realtime Signaling** | WebRTC, WebSockets, Redis | P2P Video negotiation, Events Broker et Cache Memoire. |
 | **Infrastucture** | Docker, Compose, PostgreSQL | ORM transactionnel relationnel, Containerisation complète. |
+| **Déploiement & Qualité** | GitHub Actions, Vitest | CI/CD automatisé, File d'attente WebRTC Testée et validée (TDD). |
 
 ---
 
@@ -86,6 +87,8 @@ docker exec -it cpharma_backend_1 python manage.py createsuperuser
 * **WebRTC Authentifié** : Les canaux de vidéo-diffusion rejettent tous les `anonymes`. Seuls _le_ Docteur assigné et _le_ Patient concerné peuvent passer le handshake (`Session ID Matching`).
 * **Protection Race-Condition** : L'extinction des flux (`Hangup`) exécute un ping de fermeture asynchrone pour éviter que l'un des postes maintienne un zombie state sur le Socket.
 * **Environnement Agnostique** : URL dynamiques et variables `import.meta.env` + `django.conf.settings` évitent le hardcoding (les commissions et portails WS s'adaptent instantanément à la prod via variables docker).
+* **Résilience Client Interne (ErrorBoundary & Auto-reconnect)** : Les erreurs JS non gérées sont confinées pour éviter les écrans blancs (White Screen of Death). Lors de coupures de réseau soudaines, le WebSocket embarque un **Exponential Backoff Algorithme** garantissant le rétablissement automatique (jusqu'à 30s max) de la communication.
+* **Sécurité des Données & Vie Privée (At-Rest Encryption)** : Les dossiers médicaux (allergies, antécédents, typage sanguin) sont directement encodés via _Fernet Symétrique AES-128-CBC_, interdisant aux administrateurs de la BDD tout espionnage sans la `FERNET_KEY`.
 
 ---
 <div align="center">
