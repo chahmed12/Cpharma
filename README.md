@@ -35,10 +35,12 @@ L'architecture robuste et "Production-Ready" est le fruit d'une ingénierie avan
 - **Salle d'Attente Automatisée** : Événements temps-réel via `Django Channels` et signalement instantané d'un nouveau patient.
 - **Rédaction & Signature** : Ordonnancier intelligent couplé au système de cryptographie local.
 
-### 🔐 Architecture de Sécurité Inviolable (Module PKI)
+### 🔐 Architecture de Sécurité Inviolable (Module PKI & API)
 - **Algorithme RSA-PSS / SHA-256** : Génération des paires de clés asymétriques directement dans le navigateur du médecin (`IndexedDB`) via l'API WebCrypto.
 - **Sérialisation Canonique** : L'empreinte JSON est structurée récursivement en _UTF-8 strict_ entre JS et Python pour assurer une vérification millimétrée au byte près. Aucune altération n'est tolérée par le Backend.
 - **Vérification Pharmacien Anti-MITM** : Le certificat de l'ordonnance est re-vérifié cryptographiquement *par le navigateur du point de vente*, garantissant qu'aucun réseau ou hacker local n'a falsifié le statut `is_valid`.
+- **Protection API & Session Stricte** : Authentification par JWT stockés exclusivement en **Cookies HttpOnly** (immunité totale contre les XSS). Sécurisation renforcée des endpoints par un Guard `IsVerified` obligeant la validation manuelle des professionnels par un administrateur.
+- **Durcissement Nginx & Docker** : Politique CSP stricte sans exécution inline, headers anti-sniffing et clickjacking bloqués, et isolation complète des volumes de logs (Audit).
 
 ### 💊 Environnement Pharmacien (Facturation & Point de Vente)
 - **Délivrance Numérique** : Validation rapide des identifiants d'ordonnances (Hash). Une fois les médicaments distribués, l'ordonnance est marquée stricte avec `is_dispensed=True` pour bloquer la sur-délivrance.
@@ -52,7 +54,7 @@ L'architecture robuste et "Production-Ready" est le fruit d'une ingénierie avan
 |--------|--------------|------|
 | **Frontend** | React 18, TypeScript, Tailwind | Rendu Client (SPA), UI réactive de grade supérieur. |
 | **Backend** | Python, Django, DRF, Channels | API RESTfully, Routage WebSocket asynchrone sécurisé. |
-| **Realtime Signaling** | WebRTC, WebSockets, Redis | P2P Video negotiation, Events Broker et Cache Memoire. |
+| **Realtime Signaling** | WebRTC, WebSockets, Redis, Coturn | P2P Video negotiation, Events Broker, Cache Memoire et Traversée de NAT. |
 | **Infrastucture** | Docker, Compose, PostgreSQL | ORM transactionnel relationnel, Containerisation complète. |
 | **Déploiement & Qualité** | GitHub Actions, Vitest | CI/CD automatisé, File d'attente WebRTC Testée et validée (TDD). |
 
@@ -65,12 +67,14 @@ Le système tourne de manière fluide sur n'importe quel hyperviseur grâce à s
 ### 1. Prérequis Système
 - [Docker Engine](https://docs.docker.com/get-docker/) & [Docker Compose](https://docs.docker.com/compose/install/)
 
-### 2. Démarrage de l'Infrastructure (One-Liner)
-Au sein de la racine du fichier de configuration :
+### 2. Démarrage de l'Infrastructure (Dev & Prod)
+Le projet utilise une séparation stricte des environnements (`.env` et `docker-compose.override.yml`) :
+
 ```bash
+# Lancement de l'environnement complet (Production ou Dev selon l'override)
 docker-compose up --build -d
 ```
-Les 4 services (DB Postgres, Redis Broker, Django Backend port `:8000`, React Frontend proxy) s'aligneront automatiquement de concert.
+Les différents services (DB Postgres, Redis Broker, Serveur TURN WebRTC, Backend Django et Frontend Nginx) s'aligneront automatiquement avec des **healthchecks** stricts et une politique `restart: always` pour garantir une disponibilité maximale en production. En développement local, le hot-reload ViteJS est activé via les volumes montés.
 
 ### 3. Première Configuration
 Création des schémas de base de données initiaux et du super-administrateur :
@@ -84,7 +88,7 @@ docker exec -it cpharma_backend_1 python manage.py createsuperuser
 ---
 
 ## 🧬 Décisions d'Ingénierie & Patterns
-* **WebRTC Authentifié** : Les canaux de vidéo-diffusion rejettent tous les `anonymes`. Seuls _le_ Docteur assigné et _le_ Patient concerné peuvent passer le handshake (`Session ID Matching`).
+* **WebRTC Authentifié & Relais TURN** : Les canaux de vidéo-diffusion rejettent tous les `anonymes`. Seuls _le_ Docteur assigné et _le_ Patient concerné peuvent passer le handshake (`Session ID Matching`). Pour fonctionner à travers les pare-feux stricts des hôpitaux, un serveur **Coturn** dédié garantit l'établissement du flux (NAT Traversal).
 * **Protection Race-Condition** : L'extinction des flux (`Hangup`) exécute un ping de fermeture asynchrone pour éviter que l'un des postes maintienne un zombie state sur le Socket.
 * **Environnement Agnostique** : URL dynamiques et variables `import.meta.env` + `django.conf.settings` évitent le hardcoding (les commissions et portails WS s'adaptent instantanément à la prod via variables docker).
 * **Résilience Client Interne (ErrorBoundary & Auto-reconnect)** : Les erreurs JS non gérées sont confinées pour éviter les écrans blancs (White Screen of Death). Lors de coupures de réseau soudaines, le WebSocket embarque un **Exponential Backoff Algorithme** garantissant le rétablissement automatique (jusqu'à 30s max) de la communication.
