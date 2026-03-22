@@ -153,7 +153,7 @@ export default function NewConsultation() {
                             <input className="input" placeholder="Téléphone" onChange={e => setNewPatient({...newPatient, telephone: e.target.value})} />
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                 <input className="input" type="date" onChange={e => setNewPatient({...newPatient, date_naissance: e.target.value})} />
-                                <select className="input" onChange={e => setNewPatient({...newPatient, sexe: e.target.value as any})}>
+                                <select className="input" onChange={e => setNewPatient({...newPatient, sexe: e.target.value as 'M' | 'F'})}>
                                     <option value="M">Masculin</option>
                                     <option value="F">Féminin</option>
                                 </select>

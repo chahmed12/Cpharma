@@ -28,7 +28,7 @@ REFRESH_URL      = '/api/auth/token/refresh/'
 VALID_PASSWORD   = 'TestCPharma2026!'   # ≥ 10 chars, mixte, non commun
 
 def _make_user(email='doctor@test.com', password=VALID_PASSWORD, role='MEDECIN',
-               active=True, verified=False):
+               active=True, verified=True):
     """Crée et retourne un utilisateur en base pour les tests."""
     user = User.objects.create_user(
         email=email,

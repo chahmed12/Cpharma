@@ -61,7 +61,7 @@ export default function PrescriptionForm() {
                 .finally(() => setLoading(false));
         }
         return () => controller.abort();
-    }, [id]);
+    }, [id, toast]);
 
     const updateMed = (medId: string, field: keyof Medicament, val: string) =>
         setMeds(prev => prev.map(m => m.id === medId ? { ...m, [field]: val } : m));

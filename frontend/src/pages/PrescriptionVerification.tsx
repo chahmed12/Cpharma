@@ -9,6 +9,7 @@ export default function PrescriptionVerification() {
     const { hash } = useParams<{ hash: string }>();
     const navigate = useNavigate();
     const [status, setStatus] = useState<'loading' | 'valid' | 'invalid'>('loading');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [prescription, setPrescription] = useState<any>(null);
     const [confirming, setConfirming] = useState(false);
 

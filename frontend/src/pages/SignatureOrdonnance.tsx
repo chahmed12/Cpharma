@@ -11,6 +11,7 @@ import api from '../services/api';
 export default function SignatureOrdonnance() {
     const location = useLocation();
     const navigate = useNavigate();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = location.state as any;
     const [status, setStatus] = useState<'idle' | 'loading-key' | 'signing' | 'done' | 'error'>('loading-key');
     const [keyPair, setKeyPair] = useState<CryptoKeyPair | null>(null);
@@ -51,6 +52,7 @@ export default function SignatureOrdonnance() {
                 date: new Date().toISOString()
             };
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const pdfBlob = await pdf(<OrdonnancePDF data={ordonnanceData as any} />).toBlob();
             const hash = await getSHA256Hash(pdfBlob);
             const signature = await signData(keyPair.privateKey, ordonnanceData);

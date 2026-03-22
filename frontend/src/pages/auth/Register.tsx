@@ -48,7 +48,7 @@ export default function Register() {
             setTimeout(() => {
                 navigate('/login');
             }, 1500);
-        } catch (err: any) {
+        } catch (err: unknown) {
             const msg = err.response?.data?.email?.[0] || 'Erreur lors de la création du compte.';
             toast(msg, 'error');
         } finally {

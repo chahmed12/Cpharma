@@ -30,7 +30,7 @@ export default function ConfirmationFin() {
             .finally(() => setLoading(false));
             
         return () => controller.abort();
-    }, [id]);
+    }, [id, toast]);
 
     const handleConfirm = async () => {
         if (!payment) return;
@@ -47,7 +47,7 @@ export default function ConfirmationFin() {
             a.download = `recu_consultation_${id}.pdf`;
             a.click();
             URL.revokeObjectURL(url);
-        } catch (err) {
+        } catch {
             toast("Erreur lors de la confirmation du paiement.", "error");
         }
     };

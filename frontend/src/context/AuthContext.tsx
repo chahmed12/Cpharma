@@ -20,6 +20,7 @@ interface AuthContextType {
     logout: () => void;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext<AuthContextType>(null!);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -32,10 +33,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // On vérifie la session avec l'API (qui lira le cookie)
                 const userData = await getMe();
                 setUser(userData);
-            } catch (e) {
-                // Pas de session valide ou cookie expiré
-                localStorage.removeItem('user');
-                setUser(null);
+            } catch {
+                // Si le refresh échoue, on est silencieux, le useEffect de api.ts s'en chargera
+                logout();
             } finally {
                 setIsLoading(false);
             }

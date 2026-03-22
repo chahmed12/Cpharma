@@ -1,4 +1,5 @@
 # docker-compose.override.yml
+version: '3.8'
 # Fichier de surcharges pour l'environnement de développement local.
 # Les ports et les volumes de montage à chaud (hot reload) ne doivent 
 # être activés qu'ici, et surtout pas en production.

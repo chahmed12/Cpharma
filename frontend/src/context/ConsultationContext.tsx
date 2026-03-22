@@ -10,7 +10,8 @@ interface ConsultationState {
     reset: () => void;
 }
 
-const ConsultationContext = createContext<ConsultationState>(null!);
+/* eslint-disable-next-line react-refresh/only-export-components */
+export const ConsultationContext = createContext<ConsultationState>(null!);
 
 export function ConsultationProvider({ children }: { children: ReactNode }) {
     const [consultationId, setConsultationId] = useState<number | null>(null);

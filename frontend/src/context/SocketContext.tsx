@@ -10,6 +10,7 @@ interface SocketContextType {
     off: (event: string, handler: EventHandler) => void;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const SocketContext = createContext<SocketContextType>(null!);
 
 export function SocketProvider({ children }: { children: ReactNode }) {

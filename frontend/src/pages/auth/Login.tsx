@@ -45,7 +45,7 @@ export default function Login() {
                     { replace: true }
                 );
             }
-        } catch (err) {
+        } catch {
             toast('Email ou mot de passe incorrect.', 'error');
         } finally {
             setLoading(false);

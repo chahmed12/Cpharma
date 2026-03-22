@@ -13,7 +13,9 @@ export function useSocket(
 
     // Garde toujours la dernière version du handler sans re-subscribe
     const handlerRef = useRef(handler);
-    handlerRef.current = handler;
+    useEffect(() => {
+        handlerRef.current = handler;
+    }, [handler]);
 
     useEffect(() => {
         const stableHandler = (data: unknown) => handlerRef.current(data);
