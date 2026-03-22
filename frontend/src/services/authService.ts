@@ -3,8 +3,6 @@ import type { AuthUser, Role } from '../context/AuthContext';
 
 // ─── Types ────────────────────────────────────────────
 interface LoginResponse {
-    access: string;
-    refresh: string;
     user: AuthUser;
 }
 
@@ -15,6 +13,7 @@ interface RegisterPayload {
     prenom: string;
     role: Role;
     numero_ordre?: string;  // requis si role === 'MEDECIN'
+    nom_pharmacie?: string; // requis si role === 'PHARMACIEN'
 }
 
 // ─── Login ─────────────────────────────────────────────
@@ -27,6 +26,17 @@ export async function loginUser(
     return data;
 }
 
+// ─── Logout ─────────────────────────────────────────────
+export async function logoutUser(): Promise<void> {
+    await api.post('/auth/logout/');
+}
+
+// ─── Get Me (Vérifier session) ──────────────────────────
+export async function getMe(): Promise<AuthUser> {
+    const { data } = await api.get<AuthUser>('/auth/me/');
+    return data;
+}
+
 // ─── Register ──────────────────────────────────────────
 export async function registerUser(
     payload: RegisterPayload
@@ -36,11 +46,7 @@ export async function registerUser(
 }
 
 // ─── Refresh Token ─────────────────────────────────────
-export async function refreshAccessToken(): Promise<string> {
-    const refresh = localStorage.getItem('refresh_token');
-    const { data } = await api.post<{ access: string }>(
-        '/auth/token/refresh/', { refresh }
-    );
-    localStorage.setItem('access_token', data.access);
-    return data.access;
+export async function refreshAccessToken(): Promise<void> {
+    // Le refresh token est dans un cookie HttpOnly, pas besoin de l'envoyer manuellement
+    await api.post('/auth/token/refresh/', {});
 }

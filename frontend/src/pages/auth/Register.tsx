@@ -43,9 +43,14 @@ export default function Register() {
         setLoading(true);
         try {
             await registerUser(form);
-            navigate('/login');
-        } catch {
-            toast('Erreur lors de la création du compte.', 'error');
+            toast('Compte créé avec succès ! Vous pouvez maintenant vous connecter.', 'success');
+            // Petit délai pour laisser le toast s'afficher et stabiliser l'état
+            setTimeout(() => {
+                navigate('/login');
+            }, 1500);
+        } catch (err: any) {
+            const msg = err.response?.data?.email?.[0] || 'Erreur lors de la création du compte.';
+            toast(msg, 'error');
         } finally {
             setLoading(false);
         }

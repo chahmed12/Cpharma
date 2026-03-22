@@ -1,7 +1,7 @@
 import { createContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
-import { loginUser } from '../services/authService';
+import { loginUser, logoutUser, getMe } from '../services/authService';
 
-export type Role = 'MEDECIN' | 'PHARMACIEN';
+export type Role = 'MEDECIN' | 'PHARMACIEN' | 'ADMIN';
 
 export interface AuthUser {
     id: number;
@@ -9,11 +9,11 @@ export interface AuthUser {
     nom: string;
     prenom: string;
     role: Role;
+    is_verified: boolean;
 }
 
 interface AuthContextType {
     user: AuthUser | null;
-    token: string | null;
     isAuthenticated: boolean;
     isLoading: boolean;
     login: (email: string, password: string) => Promise<AuthUser>;
@@ -24,46 +24,48 @@ export const AuthContext = createContext<AuthContextType>(null!);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AuthUser | null>(null);
-    const [token, setToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const storedToken = localStorage.getItem('access_token');
-        const storedUser = localStorage.getItem('user');
-
-        if (storedToken && storedUser) {
-            setToken(storedToken);
+        const checkSession = async () => {
             try {
-                setUser(JSON.parse(storedUser));
+                // On vérifie la session avec l'API (qui lira le cookie)
+                const userData = await getMe();
+                setUser(userData);
             } catch (e) {
-                console.error("Session corrompue", e);
-                localStorage.clear();
+                // Pas de session valide ou cookie expiré
+                localStorage.removeItem('user');
+                setUser(null);
+            } finally {
+                setIsLoading(false);
             }
-        }
-        setIsLoading(false);
+        };
+
+        checkSession();
     }, []);
 
     const login = useCallback(async (email: string, password: string): Promise<AuthUser> => {
         const data = await loginUser({ email, password });
-        localStorage.setItem('access_token', data.access);
-        localStorage.setItem('refresh_token', data.refresh);
+        // On ne stocke plus le token ! Juste les infos non-sensibles du profil
         localStorage.setItem('user', JSON.stringify(data.user));
-        setToken(data.access);
         setUser(data.user);
         return data.user;
     }, []);
 
-    const logout = useCallback(() => {
-        localStorage.clear();
-        setToken(null);
-        setUser(null);
+    const logout = useCallback(async () => {
+        try {
+            await logoutUser();
+        } finally {
+            localStorage.removeItem('user');
+            setUser(null);
+        }
     }, []);
 
     const value = useMemo(() => ({
-        user, token, isLoading,
-        isAuthenticated: !!token,
+        user, isLoading,
+        isAuthenticated: !!user,
         login, logout
-    }), [user, token, isLoading, login, logout]);
+    }), [user, isLoading, login, logout]);
 
     return (
         <AuthContext.Provider value={value}>

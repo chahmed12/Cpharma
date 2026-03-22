@@ -3,6 +3,7 @@ from django.utils              import timezone
 from rest_framework            import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response   import Response
+from apps.core.permissions     import IsVerified
 from .models                   import Payment
 from .serializers              import PaymentSerializer
 from apps.core.audit           import log_action
@@ -10,7 +11,7 @@ from apps.core.audit           import log_action
 
 class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class   = PaymentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsVerified]
 
     def get_queryset(self):
         user = self.request.user
@@ -24,9 +25,9 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['get'],
             url_path=r'consultation/(?P<consultation_id>\d+)')
     def by_consultation(self, request, consultation_id=None):
-        """Récupère le paiement d'une consultation spécifique."""
+        """Récupère le paiement d'une consultation spécifique (accès sécurisé)."""
         try:
-            p = Payment.objects.get(
+            payment = Payment.objects.select_related('consultation').get(
                 consultation_id=consultation_id
             )
         except Payment.DoesNotExist:
@@ -34,7 +35,19 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
                 {'detail': 'Paiement non trouvé'},
                 status=status.HTTP_404_NOT_FOUND
             )
-        return Response(PaymentSerializer(p).data)
+
+        # Vérification stricte des droits d'accès (IDOR fix)
+        cons = payment.consultation
+        user_id = request.user.id
+        
+        # Seuls les acteurs de CETTE consultation peuvent voir le paiement
+        if user_id != cons.medecin_id and user_id != cons.pharmacien_id:
+            return Response(
+                {'detail': 'Accès non autorisé à ce paiement.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        return Response(PaymentSerializer(payment).data)
 
     @action(detail=True, methods=['patch'], url_path='confirm')
     def confirm(self, request, pk=None):

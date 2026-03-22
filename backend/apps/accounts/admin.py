@@ -15,15 +15,16 @@ class PharmacistProfileInline(admin.StackedInline):
 
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
-    list_display   = ['email', 'nom', 'prenom', 'role', 'is_active', 'is_staff']
-    list_filter    = ['role', 'is_active', 'is_staff']
+    list_display   = ['email', 'nom', 'prenom', 'role', 'is_verified', 'is_active', 'is_staff']
+    list_filter    = ['role', 'is_verified', 'is_active', 'is_staff']
+    list_editable  = ['is_verified']
     search_fields  = ['email', 'nom', 'prenom']
     ordering       = ['email']
 
     # ← Remplacer username par email partout
     fieldsets = (
         (None,           {'fields': ('email', 'password')}),
-        ('Informations', {'fields': ('nom', 'prenom', 'role')}),
+        ('Informations', {'fields': ('nom', 'prenom', 'role', 'is_verified')}),
         ('Permissions',  {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Dates',        {'fields': ('last_login', 'date_joined')}),
     )

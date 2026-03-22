@@ -2,12 +2,13 @@ from django.db import models
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from apps.core.permissions import IsVerified
 from .models import Patient, MedicalRecord
 from .serializers import PatientSerializer, MedicalRecordSerializer
 
 class PatientViewSet(viewsets.ModelViewSet):
     serializer_class = PatientSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsVerified]
 
     def get_queryset(self):
         user = self.request.user

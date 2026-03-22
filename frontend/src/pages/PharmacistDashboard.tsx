@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAvailableDoctors, type Doctor }
+import { getAvailableDoctors, type Doctor, type DoctorStatus }
     from '../services/medecinService';
 import { getHistory, type Consultation }
     from '../services/consultationService';
@@ -55,7 +55,7 @@ function DoctorCard({ doc, index, onStart }: {
                     color: '#fff', fontWeight: '700', fontSize: '15px',
                     flexShrink: 0,
                 }}>
-                    {doc.prenom[0]}{doc.nom[0]}
+                    {(doc.prenom?.[0] || '?')}{(doc.nom?.[0] || '?')}
                 </div>
 
                 {/* Badge statut */}{/* Point pulsant pour online */}
@@ -159,10 +159,12 @@ export default function PharmacistDashboard() {
 
     // ecouter les changements de statut des médecins
     useSocket('doctor_status_changed', (data) => {
-        const { doctor_id, status } = data as any;
-        setDoctors(prev =>
-            prev.map(d => d.id === doctor_id ? { ...d, status } : d)
-        );
+        const payload = data as { doctor_id: number; status: DoctorStatus };
+        if (payload?.doctor_id && payload?.status) {
+            setDoctors(prev =>
+                prev.map(d => d.id === payload.doctor_id ? { ...d, status: payload.status } : d)
+            );
+        }
     });
 
     const onlineCount = doctors.filter(d => d.status === 'ONLINE').length;

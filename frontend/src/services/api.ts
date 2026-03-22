@@ -8,14 +8,10 @@ const getBaseUrl = () => {
 const api = axios.create({
     baseURL: getBaseUrl(),
     headers: { 'Content-Type': 'application/json' },
+    withCredentials: true, // IMPORTANT: Envoie les cookies HttpOnly
 });
 
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
-});
-
+// Les interceptors ne manipulent plus le localStorage pour les tokens
 api.interceptors.response.use(
     (res) => res,
     async (err) => {
@@ -23,14 +19,20 @@ api.interceptors.response.use(
         if (err.response?.status === 401 && !original._retry) {
             original._retry = true;
             try {
-                const refresh = localStorage.getItem('refresh_token');
-                const { data } = await axios.post(`${getBaseUrl()}/auth/token/refresh/`, { refresh });
-                localStorage.setItem('access_token', data.access);
-                original.headers.Authorization = `Bearer ${data.access}`;
+                // Le refresh token est aussi dans un cookie HttpOnly, 
+                // l'appel au refresh se fait donc tout seul avec withCredentials
+                await axios.post(`${getBaseUrl()}/auth/token/refresh/`, {}, { withCredentials: true });
                 return api(original);
-            } catch {
-                localStorage.clear();
-                window.location.href = '/login';
+            } catch (refreshError) {
+                // Si le refresh échoue, on déconnecte l'utilisateur localement
+                localStorage.removeItem('user');
+
+                // On redirige vers login UNIQUEMENT si on n'y est pas déjà
+                // pour éviter une boucle de rechargement infinie
+                if (window.location.pathname !== '/login') {
+                    window.location.href = '/login';
+                }
+                return Promise.reject(refreshError);
             }
         }
         return Promise.reject(err);

@@ -1,6 +1,8 @@
-from rest_framework          import viewsets, permissions, status
+from rest_framework          import viewsets, status
 from rest_framework.response  import Response
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from apps.core.permissions    import IsVerified
 from channels.layers          import get_channel_layer
 from asgiref.sync             import async_to_sync
 from .models                  import Consultation
@@ -10,7 +12,7 @@ channel_layer = get_channel_layer()
 
 class ConsultationViewSet(viewsets.ModelViewSet):
     serializer_class   = ConsultationSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsVerified]
 
     def get_queryset(self):
         user = self.request.user

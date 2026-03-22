@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useAuth } from './useAuth';
 
 interface UseWebRTCOptions {
     consultationId: number;
@@ -19,7 +18,6 @@ const ICE_SERVERS = {
 };
 
 export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
-    const { token } = useAuth();
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -31,7 +29,7 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
     const [isCamOn, setIsCamOn] = useState(true);
 
     useEffect(() => {
-        if (!token || !consultationId) return;
+        if (!consultationId) return;
 
         let isMounted = true;
         let localMediaReady = false;
@@ -44,7 +42,7 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             wsUrl = `${protocol}//${window.location.host}/ws`;
         }
-        const ws = new WebSocket(`${wsUrl}/webrtc/${consultationId}/?token=${token}`);
+        const ws = new WebSocket(`${wsUrl}/webrtc/${consultationId}/`);
         wsRef.current = ws;
 
         const pc = new RTCPeerConnection(ICE_SERVERS);
@@ -166,7 +164,7 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
             pc.close();
             localStreamRef.current?.getTracks().forEach(t => t.stop());
         };
-    }, [consultationId, isCaller, token]);
+    }, [consultationId, isCaller]);
 
     const toggleMic = useCallback(() => {
         localStreamRef.current?.getAudioTracks().forEach(t => t.enabled = !t.enabled);

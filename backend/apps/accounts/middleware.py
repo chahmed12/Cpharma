@@ -15,18 +15,33 @@ def get_user_from_token(token):
     except Exception:
         return AnonymousUser()
 
+from django.conf import settings
+
 class JwtAuthMiddleware:
     """
-    Middleware personnalisé pour authentifier les WebSockets via JWT dans l'URL.
-    Usage: ws://.../?token=ACCESS_TOKEN
+    Middleware personnalisé pour authentifier les WebSockets via JWT.
+    Priorité: Cookie HttpOnly (SOL-SEC-8), Fallback: Query String (?token=...)
     """
     def __init__(self, app):
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        query_string = scope.get('query_string', b'').decode()
-        query_params = parse_qs(query_string)
-        token        = query_params.get('token', [None])[0]
+        # 1. On cherche d'abord dans les cookies (Méthode sécurisée)
+        cookies = scope.get('headers', [])
+        cookie_header = next((v for k, v in cookies if k == b'cookie'), b'').decode()
+        
+        token = None
+        if cookie_header:
+            from http.cookies import SimpleCookie
+            cookie = SimpleCookie(cookie_header)
+            if settings.AUTH_COOKIE in cookie:
+                token = cookie[settings.AUTH_COOKIE].value
+
+        # 2. Fallback sur la query string (Si pas de cookie, ex: environnements de test)
+        if not token:
+            query_string = scope.get('query_string', b'').decode()
+            query_params = parse_qs(query_string)
+            token = query_params.get('token', [None])[0]
 
         if token:
             scope['user'] = await get_user_from_token(token)

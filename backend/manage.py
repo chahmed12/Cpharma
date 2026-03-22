@@ -7,6 +7,13 @@ import sys
 def main():
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+    
+    # --- Monkey patch pour django-fernet-fields-v2 (compatibilité Django 4+) ---
+    import django.utils.encoding
+    if not hasattr(django.utils.encoding, 'force_text'):
+        django.utils.encoding.force_text = django.utils.encoding.force_str
+    # ---------------------------------------------------------------------------
+
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

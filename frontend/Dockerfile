@@ -3,18 +3,25 @@ FROM node:22-slim AS build
 
 WORKDIR /app
 
-# On installe les dépendances
+# On installe les dépendances avec CI pour reproductibilité
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 # Copier le reste du code
 COPY . .
 
-# Argument de build pour l'API URL
+# Argument de build pour l'API URL et WebRTC TURN
 ARG VITE_API_URL
 ARG VITE_WS_URL
+ARG VITE_TURN_URL
+ARG VITE_TURN_USERNAME
+ARG VITE_TURN_CREDENTIAL
+
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_WS_URL=$VITE_WS_URL
+ENV VITE_TURN_URL=$VITE_TURN_URL
+ENV VITE_TURN_USERNAME=$VITE_TURN_USERNAME
+ENV VITE_TURN_CREDENTIAL=$VITE_TURN_CREDENTIAL
 
 # Build de l'application (Vite génère le dossier /dist)
 RUN npm run build

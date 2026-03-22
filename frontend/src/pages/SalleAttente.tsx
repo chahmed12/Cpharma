@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import { Spinner } from '../components/ui/Spinner';
@@ -8,6 +8,7 @@ export default function SalleAttente() {
     const { id } = useParams<{ id: string }>();
     const consultationId = id ? Number(id) : null;
     const [dots, setDots] = useState('');
+    const hasNavigated = useRef(false);
 
     // Animation des points d'attente
     useEffect(() => {
@@ -21,7 +22,8 @@ export default function SalleAttente() {
     const { isConnected } = useSocket('consultation_accepted', (data) => {
         const payload = data as { consultation_id: number };
         // On vérifie que c'est bien notre consultation qui est acceptée
-        if (payload.consultation_id === consultationId) {
+        if (payload.consultation_id === consultationId && !hasNavigated.current) {
+            hasNavigated.current = true;
             navigate(`/pharmacist/video/${consultationId}`);
         }
     });
@@ -33,9 +35,11 @@ export default function SalleAttente() {
         const controller = new AbortController();
 
         const checkStatus = () => {
+            if (hasNavigated.current) return;
             import('../services/consultationService').then(({ getConsultation }) => {
                 getConsultation(consultationId, { signal: controller.signal }).then(c => {
-                    if (c.status === 'ACTIVE') {
+                    if (c.status === 'ACTIVE' && !hasNavigated.current) {
+                        hasNavigated.current = true;
                         navigate(`/pharmacist/video/${consultationId}`);
                     }
                 }).catch(err => {

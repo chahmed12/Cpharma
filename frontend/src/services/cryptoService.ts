@@ -62,15 +62,44 @@ export async function loadOrGenerateKeyPair(): Promise<{
     let isNew = false;
 
     if (!kp) {
-        kp = await window.crypto.subtle.generateKey(RSA_PARAMS, true, ['sign', 'verify']);
+        // 1. Génération temporaire (extractable=true pour pouvoir manipuler)
+        const tempKp = await window.crypto.subtle.generateKey(RSA_PARAMS, true, ['sign', 'verify']);
+        
+        // 2. Sécurisation de la clé privée : Export -> Import avec extractable=false
+        const exportedPriv = await window.crypto.subtle.exportKey('pkcs8', tempKp.privateKey);
+        const securePrivKey = await window.crypto.subtle.importKey(
+            'pkcs8',
+            exportedPriv,
+            RSA_PARAMS,
+            false, // SÉCURITÉ : La clé privée devient non-extractable (hardware/browser protected)
+            ['sign']
+        );
+
+        // On reconstruit la paire avec la clé privée sécurisée
+        kp = {
+            publicKey: tempKp.publicKey,
+            privateKey: securePrivKey
+        };
+        
         await saveKeyPair(db, kp);
         isNew = true;
     }
 
-    const exported  = await window.crypto.subtle.exportKey('spki', kp.publicKey);
-    const publicKeyB64 = btoa(String.fromCharCode(...new Uint8Array(exported)));
-
-    return { keyPair: kp, publicKeyB64, isNew };
+    // L'export de la clé publique fonctionne car elle reste extractable (propriété de l'objet importé ?)
+    // Atttention : Si tempKp.publicKey a extractable=true, c'est bon.
+    // Mais si on recharge depuis DB, il faut que la clé publique soit extractable.
+    // Lors du saveKeyPair, on a sauvé tempKp.publicKey (qui est extractable=true).
+    
+    // Vérifions si on peut exporter la clé publique chargée
+    try {
+        const exported = await window.crypto.subtle.exportKey('spki', kp.publicKey);
+        const publicKeyB64 = btoa(String.fromCharCode(...new Uint8Array(exported)));
+        return { keyPair: kp, publicKeyB64, isNew };
+    } catch (e) {
+        // Fallback si la clé publique n'est pas exportable (ne devrait pas arriver avec la logique ci-dessus)
+        console.error("Erreur export clé publique:", e);
+        throw e;
+    }
 }
 
 function canonicalize(obj: unknown): unknown {

@@ -13,14 +13,19 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (user)
-            navigate(
-                user.role === 'MEDECIN'
-                    ? '/doctor/dashboard'
-                    : '/pharmacist/dashboard',
-                { replace: true }
-            );
-    }, [user]);
+        if (user) {
+            if (!user.is_verified) {
+                navigate('/pending', { replace: true });
+            } else {
+                navigate(
+                    user.role === 'MEDECIN'
+                        ? '/doctor/dashboard'
+                        : '/pharmacist/dashboard',
+                    { replace: true }
+                );
+            }
+        }
+    }, [user, navigate]);
 
     const handleSubmit = async () => {
         if (!email || !password) {
@@ -30,13 +35,17 @@ export default function Login() {
         setLoading(true);
         try {
             const u = await login(email, password);
-            navigate(
-                u.role === 'MEDECIN'
-                    ? '/doctor/dashboard'
-                    : '/pharmacist/dashboard',
-                { replace: true }
-            );
-        } catch {
+            if (!u.is_verified) {
+                navigate('/pending', { replace: true });
+            } else {
+                navigate(
+                    u.role === 'MEDECIN'
+                        ? '/doctor/dashboard'
+                        : '/pharmacist/dashboard',
+                    { replace: true }
+                );
+            }
+        } catch (err) {
             toast('Email ou mot de passe incorrect.', 'error');
         } finally {
             setLoading(false);

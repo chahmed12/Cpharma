@@ -13,14 +13,14 @@ interface SocketContextType {
 export const SocketContext = createContext<SocketContextType>(null!);
 
 export function SocketProvider({ children }: { children: ReactNode }) {
-    const { token, isAuthenticated } = useAuth();
+    const { isAuthenticated } = useAuth();
     const wsRef = useRef<WebSocket | null>(null);
     const handlersRef = useRef<Map<string, Set<EventHandler>>>(new Map());
     const [isConnected, setIsConnected] = useState(false);
 
     // Initialisation de la WebSocket
     useEffect(() => {
-        if (!isAuthenticated || !token) {
+        if (!isAuthenticated) {
             if (wsRef.current) {
                 wsRef.current.close();
                 wsRef.current = null;
@@ -44,7 +44,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
                 }
             }
             
-            const ws = new WebSocket(`${wsUrl}/queue/?token=${token}`);
+            // Note: Le token n'est plus envoyé dans l'URL (SOL-SEC-8 en cours)
+            const ws = new WebSocket(`${wsUrl}/queue/`);
             wsRef.current = ws;
 
             ws.onopen = () => {
@@ -87,7 +88,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
                 wsRef.current = null;
             }
         };
-    }, [isAuthenticated, token]);
+    }, [isAuthenticated]);
 
     // Fonctions stables avec useCallback
     const send = useCallback((type: string, payload: unknown) => {

@@ -2,12 +2,13 @@ services:
   # ─── BASE DE DONNÉES ─────────────────────────────
   db:
     image: postgres:15-alpine
+    restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=pharma_db
-      - POSTGRES_USER=pharma_user
-      - POSTGRES_PASSWORD=zenvour
+      - POSTGRES_DB=${POSTGRES_DB:-pharma_db}
+      - POSTGRES_USER=${POSTGRES_USER:-pharma_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-zenvour}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pharma_user -d pharma_db"]
       interval: 5s
@@ -17,15 +18,22 @@ services:
   # ─── REDIS (WebSockets) ──────────────────────────
   redis:
     image: redis:7-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # ─── TURN SERVER (WebRTC via NAT restrictif) ─────
   turn:
     image: coturn/coturn
+    restart: always
     command: >
       -n --log-file=stdout
       --min-port=49152 --max-port=65535
-      --realm=pharma.local
-      --user=cpharma:cpharma_secret
+      --realm=${TURN_REALM:-pharma.local}
+      --user=${VITE_TURN_USERNAME:-cpharma}:${VITE_TURN_CREDENTIAL:-cpharma_secret}
       --listening-port=3478
     ports:
       - "3478:3478/udp"
@@ -34,16 +42,16 @@ services:
   # ─── BACKEND (Django + Daphne) ───────────────────
   backend:
     build: ./backend
+    restart: always
     volumes:
-      - ./backend:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     environment:
-      - DEBUG=True
-      - SECRET_KEY=prod-secret-key-cpharma
-      - POSTGRES_DB=pharma_db
-      - POSTGRES_USER=pharma_user
-      - POSTGRES_PASSWORD=zenvour
+      - DEBUG=${DEBUG:-False}
+      - SECRET_KEY=${SECRET_KEY:-prod-secret-key-cpharma}
+      - POSTGRES_DB=${POSTGRES_DB:-pharma_db}
+      - POSTGRES_USER=${POSTGRES_USER:-pharma_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-zenvour}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
       - REDIS_HOST=redis
@@ -51,18 +59,19 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
 
   # ─── FRONTEND (React + Nginx) ────────────────────
   frontend:
+    restart: always
     build:
       context: ./frontend
       args:
-        - VITE_API_URL=/api
-        - VITE_WS_URL=ws://localhost:80/ws
-        - VITE_TURN_URL=turn:localhost:3478
-        - VITE_TURN_USERNAME=cpharma
-        - VITE_TURN_CREDENTIAL=cpharma_secret
+        - VITE_API_URL=${VITE_API_URL:-/api}
+        - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:80/ws}
+        - VITE_TURN_URL=${VITE_TURN_URL:-turn:localhost:3478}
+        - VITE_TURN_USERNAME=${VITE_TURN_USERNAME:-cpharma}
+        - VITE_TURN_CREDENTIAL=${VITE_TURN_CREDENTIAL:-cpharma_secret}
     ports:
       - "80:80"
     depends_on:

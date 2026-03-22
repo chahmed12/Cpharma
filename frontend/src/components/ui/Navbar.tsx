@@ -9,6 +9,9 @@ const NAV_LINKS = {
         { href: '/pharmacist/dashboard', label: 'Tableau de bord' },
         { href: '/pharmacist/new-consultation', label: 'Nouvelle consultation' },
     ],
+    ADMIN: [
+        { href: '/admin', label: 'Dashboard Admin' },
+    ],
 };
 
 export function Navbar() {

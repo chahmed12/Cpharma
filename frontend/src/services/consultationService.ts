@@ -6,7 +6,8 @@ export type ConsultationStatus =
 
 export interface Consultation {
     id: number;
-    medecin_id: number;
+    medecin: number;
+    pharmacien: number;
     patient_details: Patient; // Nouveau champ lié
     status: ConsultationStatus;
     created_at: string;

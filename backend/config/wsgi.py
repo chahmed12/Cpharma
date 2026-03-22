@@ -13,4 +13,10 @@ from django.core.wsgi import get_wsgi_application
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
+# --- Monkey patch pour django-fernet-fields-v2 (compatibilité Django 4+) ---
+import django.utils.encoding
+if not hasattr(django.utils.encoding, 'force_text'):
+    django.utils.encoding.force_text = django.utils.encoding.force_str
+# ---------------------------------------------------------------------------
+
 application = get_wsgi_application()

@@ -1,0 +1,29 @@
+# docker-compose.override.yml
+# Fichier de surcharges pour l'environnement de développement local.
+# Les ports et les volumes de montage à chaud (hot reload) ne doivent 
+# être activés qu'ici, et surtout pas en production.
+
+services:
+  backend:
+    # Hot-reload du code source backend
+    volumes:
+      - ./backend:/app:z
+    # On expose le port 8000 uniquement en dev pour requêter l'API en direct si besoin
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+
+  frontend:
+    # En dev, on n'utilise pas le build Nginx
+    # On surcharge la commande pour utiliser le serveur de dev Vite
+    build:
+      context: ./frontend
+    volumes:
+      - ./frontend:/app:z
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    ports:
+      - "5173:5173"
+    environment:
+      - CHOKIDAR_USEPOLLING=true

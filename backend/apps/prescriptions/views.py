@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from rest_framework                               import viewsets, permissions, status
 from rest_framework.decorators                    import action
 from rest_framework.response                      import Response
+from apps.core.permissions                        import IsVerified
 from .models                                      import Prescription
 from .serializers                                 import PrescriptionSerializer
 from apps.core.audit                              import log_action
@@ -43,7 +44,7 @@ def verify_rsa_signature(public_key_b64: str, signature_b64: str, data: dict) ->
 
 class PrescriptionViewSet(viewsets.ModelViewSet):
     serializer_class   = PrescriptionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsVerified]
 
     def get_queryset(self):
         user = self.request.user

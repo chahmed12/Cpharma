@@ -1,6 +1,19 @@
 from django.db import models
 from fernet_fields import EncryptedTextField, EncryptedCharField
 
+# --- Monkey patch pour corriger le bug de django-fernet-fields-v2 sous Python 3.11+ ---
+from django.utils.encoding import force_bytes, force_str
+from fernet_fields.fields import EncryptedField
+
+def patched_from_db_value(self, value, expression, connection, *args):
+    if value is not None:
+        # Au lieu de value = bytes(value) qui échoue sur les chaînes en Python 3
+        value = force_bytes(value)
+        return self.to_python(force_str(self.fernet.decrypt(value)))
+
+EncryptedField.from_db_value = patched_from_db_value
+# ------------------------------------------------------------------------------------
+
 class Patient(models.Model):
     class Sexe(models.TextChoices):
         MASCULIN = 'M', 'Masculin'

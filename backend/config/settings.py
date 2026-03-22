@@ -7,8 +7,10 @@ from pathlib  import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-prod-key-must-be-changed')
-DEBUG      = os.environ.get('DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = ['*']
+DEBUG      = os.environ.get('DEBUG', 'False') == 'True' # Par défaut False en prod
+
+allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1]')
+ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.strip()]
 
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
@@ -27,6 +29,7 @@ INSTALLED_APPS = [
     'apps.consultations',
     'apps.prescriptions',
     'apps.payments',
+    'rest_framework_simplejwt.token_blacklist',
 
 ]
 
@@ -80,22 +83,66 @@ CHANNEL_LAYERS = {
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.core.authentication.CookieJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 25,
+    # Protection contre le brute-force (Rate Limiting)
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '20/minute',  # Limite stricte pour les anonymes (login/register)
+        'user': '100/minute', # Limite large pour les utilisateurs
+    }
 }
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME':  timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS':  True,
+    'BLACKLIST_AFTER_ROTATION': True,
 }
 
-CORS_ALLOW_ALL_ORIGINS = DEBUG # Autorise tout en dev, restreint en prod via variable d'env
+# Configuration CORS sécurisée
+CORS_ALLOW_ALL_ORIGINS = False # Jamais True en prod !
+CORS_ALLOW_CREDENTIALS = True
+
+cors_origins_env = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost')
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
+
+# Sécurité des cookies JWT
+AUTH_COOKIE = 'access_token'
+AUTH_COOKIE_REFRESH = 'refresh_token'
+AUTH_COOKIE_DOMAIN = None
+AUTH_COOKIE_SECURE = not DEBUG # True en prod (HTTPS obligatoire)
+AUTH_COOKIE_HTTP_ONLY = True
+AUTH_COOKIE_PATH = '/'
+AUTH_COOKIE_SAMESITE = 'Lax'
+
+# Politique de mots de passe renforcée
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 10, # Minimum 10 caractères
+        }
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
+
 
 STATIC_URL  = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'

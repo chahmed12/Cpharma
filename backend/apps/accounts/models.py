@@ -17,6 +17,10 @@ class CustomUser(AbstractUser):
         choices=Role.choices,
         default=Role.MEDECIN
     )
+    is_verified = models.BooleanField(
+        default=False,
+        help_text="Cocher pour autoriser l'accès complet à l'application."
+    )
 
     USERNAME_FIELD  = 'email'
     REQUIRED_FIELDS = ['username', 'nom', 'prenom']
