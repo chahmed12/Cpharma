@@ -49,7 +49,8 @@ export default function Register() {
                 navigate('/login');
             }, 1500);
         } catch (err: unknown) {
-            const msg = err.response?.data?.email?.[0] || 'Erreur lors de la création du compte.';
+            const error = err as any;
+            const msg = error.response?.data?.email?.[0] || 'Erreur lors de la création du compte.';
             toast(msg, 'error');
         } finally {
             setLoading(false);

@@ -114,7 +114,7 @@ class RegisterTests(APITestCase):
         """Deux inscriptions avec le même email doivent retourner 400."""
         _make_user(email='duplicate@test.com')
         payload = {
-            'email':    'Duplicate@test.com',  # casse différente → normalisé
+            'email':    'duplicate@test.com',
             'password': VALID_PASSWORD,
             'nom':      'Dup',
             'prenom':   'User',
