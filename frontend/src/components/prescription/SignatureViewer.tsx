@@ -1,3 +1,5 @@
+import { CheckCircle2, XCircle } from 'lucide-react';
+
 interface Props {
     isValid: boolean;
     medecinNom: string;
@@ -13,7 +15,7 @@ export function SignatureViewer({ isValid, medecinNom, date, hash }: Props) {
             }`}>
 
             <div className="flex items-center gap-3 mb-3">
-                <span className="text-3xl">{isValid ? '✅' : '❌'}</span>
+                <span className="flex items-center justify-center">{isValid ? <CheckCircle2 className="text-green-500" size={32} /> : <XCircle className="text-red-500" size={32} />}</span>
                 <div>
                     <p className={`font-bold text-lg ${isValid ? 'text-green-700' : 'text-red-700'}`}>
                         {isValid ? 'Ordonnance authentique' : 'Signature invalide — ordonnance suspecte'}

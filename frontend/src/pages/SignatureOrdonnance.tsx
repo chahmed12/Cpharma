@@ -7,6 +7,7 @@ import { Spinner } from '../components/ui/Spinner';
 import { pdf } from '@react-pdf/renderer';
 import { OrdonnancePDF } from '../components/prescription/OrdonnancePDF';
 import api from '../services/api';
+import { KeyRound, CheckCircle2, Lock, CheckCircle, AlertOctagon } from 'lucide-react';
 
 export default function SignatureOrdonnance() {
     const location = useLocation();
@@ -86,8 +87,8 @@ export default function SignatureOrdonnance() {
                 <div className="animate-fade-up" style={{ marginBottom: '24px' }}>
                     <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Signer l'ordonnance</h1>
                     {isLoading && (
-                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px' }}>
-                            🔑 Chargement de la clé de signature...
+                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '6px', display: 'flex', alignItems: 'center' }}>
+                            <KeyRound className="inline mr-2 text-gray-400" size={16} /> Chargement de la clé de signature...
                         </p>
                     )}
                 </div>
@@ -98,8 +99,8 @@ export default function SignatureOrdonnance() {
                     <hr style={{ margin: '16px 0' }} />
                     <p style={{ fontSize: '14px' }}>{data.medicaments?.length} médicament(s) prescrit(s)</p>
                     {!isLoading && !isError && (
-                        <p style={{ fontSize: '12px', color: 'var(--green-600)', marginTop: '8px' }}>
-                            ✅ Clé RSA chargée — Prêt à signer
+                        <p style={{ fontSize: '12px', color: 'var(--green-600)', marginTop: '8px', display: 'flex', alignItems: 'center' }}>
+                            <CheckCircle2 className="inline mr-2 text-green-500" size={16} /> Clé RSA chargée — Prêt à signer
                         </p>
                     )}
                 </div>
@@ -115,9 +116,9 @@ export default function SignatureOrdonnance() {
                 >
                     {isLoading && <><Spinner size="sm" /> Chargement de la clé...</>}
                     {isSigning && <><Spinner size="sm" /> Signature en cours...</>}
-                    {isDone && '✓ Ordonnance signée — Redirection...'}
-                    {isError && '⛔ Erreur — Rechargez la page'}
-                    {status === 'idle' && '🔐 Signer numériquement'}
+                    {isDone && <><CheckCircle className="inline mr-2" size={18} /> Ordonnance signée — Redirection...</>}
+                    {isError && <><AlertOctagon className="inline mr-2" size={18} /> Erreur — Rechargez la page</>}
+                    {status === 'idle' && <><Lock className="inline mr-2" size={18} /> Signer numériquement</>}
                 </button>
             </div>
         </div>

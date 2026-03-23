@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
+
 const NAV_LINKS = {
     MEDECIN: [
         { href: '/doctor/dashboard', label: 'Tableau de bord' },
@@ -41,24 +42,20 @@ export function Navbar() {
                 {/* Logo */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
                     onClick={() => navigate(links[0].href)}>
+                    <img src="/logo.svg" alt="Cpharma" style={{ height: '32px', objectFit: 'contain' }} onError={(e) => {
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        if (target.nextElementSibling) (target.nextElementSibling as HTMLElement).style.display = 'block';
+                    }} />
                     <div style={{
                         width: '32px', height: '32px',
-                        background: 'linear-gradient(135deg, var(--blue-600), #6366f1)',
+                        background: 'linear-gradient(135deg, var(--green-600), #10b981)',
                         borderRadius: '8px',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        display: 'none', alignItems: 'center', justifyContent: 'center',
                         flexShrink: 0,
                     }}>
-                        <span style={{
-                            color: '#fff', fontWeight: '800',
-                            fontSize: '13px', fontFamily: 'var(--font-display)',
-                        }}>✚</span>
+                        <span style={{ color: '#fff', fontWeight: '800', fontSize: '16px' }}>C</span>
                     </div>
-                    <span style={{
-                        fontFamily: 'var(--font-display)',
-                        fontWeight: '700',
-                        fontSize: '15px',
-                        color: 'var(--text-primary)',
-                    }}>PharmaConsult</span>
                 </div>
 
                 {/* Liens nav */}
@@ -92,18 +89,31 @@ export function Navbar() {
 
                 {/* Avatar + nom */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                        width: '32px', height: '32px',
-                        background: 'var(--blue-50)',
-                        border: '1px solid var(--blue-200)',
-                        borderRadius: '50%',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '12px', fontWeight: '700',
-                        color: 'var(--blue-700)',
-                        flexShrink: 0,
-                    }}>
-                        {user?.prenom?.[0]}{user?.nom?.[0]}
-                    </div>
+                    {user?.photo_url ? (
+                        <img 
+                            src={user.photo_url} 
+                            alt={`${user.prenom} ${user.nom}`} 
+                            style={{
+                                width: '32px', height: '32px',
+                                borderRadius: '50%',
+                                objectFit: 'cover',
+                                border: '1px solid var(--border)',
+                            }}
+                        />
+                    ) : (
+                        <div style={{
+                            width: '32px', height: '32px',
+                            background: 'var(--blue-50)',
+                            border: '1px solid var(--blue-200)',
+                            borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '12px', fontWeight: '700',
+                            color: 'var(--blue-700)',
+                            flexShrink: 0,
+                        }}>
+                            {user?.prenom?.[0]}{user?.nom?.[0]}
+                        </div>
+                    )}
                     <div>
                         <p style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', margin: 0, lineHeight: '1.3' }}>
                             {user?.role === 'MEDECIN' ? 'Dr. ' : ''}{user?.prenom} {user?.nom}

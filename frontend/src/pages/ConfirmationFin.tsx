@@ -10,6 +10,7 @@ import { RecuPDF } from '../components/prescription/RecuPDF';
 import { Navbar } from '../components/ui/Navbar';
 import { Spinner } from '../components/ui/Spinner';
 import { useToast } from '../hooks/useToast';
+import { AlertTriangle, Check, CheckCircle } from 'lucide-react';
 
 export default function ConfirmationFin() {
     const { id }     = useParams<{ id: string }>();
@@ -59,7 +60,7 @@ export default function ConfirmationFin() {
         <div className="page-wrapper">
             <Navbar />
             <div className="page-content-narrow" style={{ paddingTop: '48px', textAlign: 'center' }}>
-                <p style={{ fontSize: '36px', marginBottom: '12px' }}>⚠️</p>
+                <AlertTriangle size={48} className="text-yellow-500 mx-auto mb-3" />
                 <p style={{ fontWeight: '600', marginBottom: '8px' }}>
                     Paiement introuvable.
                 </p>
@@ -110,12 +111,12 @@ export default function ConfirmationFin() {
                         style={{ background: 'var(--green-600)', borderColor: 'var(--green-600)' }}
                         onClick={handleConfirm}
                     >
-                        ✓ Confirmer le paiement en espèces
+                        <Check className="inline mr-2" size={18} /> Confirmer le paiement en espèces
                     </button>
                 ) : (
                     <div style={{ textAlign: 'center', paddingTop: '12px' }}>
-                        <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--green-600)', marginBottom: '16px' }}>
-                            ✅ Paiement confirmé — Reçu téléchargé
+                        <p style={{ fontSize: '20px', fontWeight: '700', color: 'var(--green-600)', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <CheckCircle className="inline mr-2 text-green-500" size={24} /> Paiement confirmé — Reçu téléchargé
                         </p>
                         <button
                             className="btn btn-secondary"

@@ -6,6 +6,12 @@ import sys
 
 def main():
     """Run administrative tasks."""
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
+        
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
     
     # --- Monkey patch pour django-fernet-fields-v2 (compatibilité Django 4+) ---

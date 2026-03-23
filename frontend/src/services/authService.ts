@@ -1,19 +1,9 @@
 import api from './api';
-import type { AuthUser, Role } from '../context/AuthContext';
+import type { AuthUser } from '../context/AuthContext';
 
 // ─── Types ────────────────────────────────────────────
 interface LoginResponse {
     user: AuthUser;
-}
-
-interface RegisterPayload {
-    email: string;
-    password: string;
-    nom: string;
-    prenom: string;
-    role: Role;
-    numero_ordre?: string;  // requis si role === 'MEDECIN'
-    nom_pharmacie?: string; // requis si role === 'PHARMACIEN'
 }
 
 // ─── Login ─────────────────────────────────────────────
@@ -39,9 +29,11 @@ export async function getMe(): Promise<AuthUser> {
 
 // ─── Register ──────────────────────────────────────────
 export async function registerUser(
-    payload: RegisterPayload
+    payload: FormData
 ): Promise<{ message: string }> {
-    const { data } = await api.post('/auth/register/', payload);
+    const { data } = await api.post('/auth/register/', payload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return data;
 }
 

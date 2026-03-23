@@ -19,11 +19,13 @@ from asgiref.sync import async_to_sync
 from django.conf                  import settings
 from django.contrib.auth          import authenticate
 from django.core.exceptions       import ObjectDoesNotExist
+from django.core.mail             import send_mail
 
 # ── 3. Django REST Framework ──────────────────────────────────────────────────
 from rest_framework                  import permissions, status
-from rest_framework.decorators       import api_view, permission_classes
+from rest_framework.decorators       import api_view, permission_classes, throttle_classes
 from rest_framework.response         import Response
+from rest_framework.throttling       import AnonRateThrottle
 
 # ── 4. Simple JWT ─────────────────────────────────────────────────────────────
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -81,13 +83,34 @@ def _delete_auth_cookies(response: Response) -> None:
 def register(request):
     """
     Crée un nouveau compte (MEDECIN ou PHARMACIEN uniquement).
+    Accepte multipart/form-data pour permettre l'envoi d'une image de profil.
     Le compte est créé avec is_verified=False → en attente d'approbation admin.
     """
-    serializer = RegisterSerializer(data=request.data)
+    serializer = RegisterSerializer(
+        data=request.data,
+        context={'request': request},
+    )
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    serializer.save()
+    user = serializer.save()
+    
+    # Notification email à l'administrateur
+    admin_emails = [email for name, email in getattr(settings, 'ADMINS', [])]
+    if not admin_emails:
+        admin_emails = [getattr(settings, 'DEFAULT_FROM_EMAIL', 'admin@pfamedical.local')]
+        
+    try:
+        send_mail(
+            subject="Nouvelle inscription PFA Medical",
+            message=f"Un nouvel utilisateur ({user.role}) s'est inscrit : {user.email}.\nVeuillez valider son compte dans l'interface d'administration.",
+            from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@pfamedical.local'),
+            recipient_list=admin_emails,
+            fail_silently=True,
+        )
+    except Exception:
+        pass  # On ignore silencieusement si le SMTP n'est pas configuré
+
     return Response(
         {'message': 'Compte créé avec succès. En attente de validation par un administrateur.'},
         status=status.HTTP_201_CREATED,
@@ -134,6 +157,7 @@ def login(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([AnonRateThrottle])
 def refresh_token_view(request):
     """
     Rafraîchit le token d'accès en lisant le refresh token depuis le cookie HttpOnly.
@@ -206,9 +230,13 @@ def doctors_online(request):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated, IsVerified])
 def doctors_list(request):
-    """Retourne la liste complète de tous les médecins."""
-    profiles = DoctorProfile.objects.select_related('user').all()
-    return Response(DoctorListSerializer(profiles, many=True).data, status=status.HTTP_200_OK)
+    """Retourne la liste de tous les médecins (paginée)."""
+    from rest_framework.pagination import PageNumberPagination
+    profiles = DoctorProfile.objects.select_related('user').all().order_by('id')
+    paginator = PageNumberPagination()
+    page = paginator.paginate_queryset(profiles, request)
+    serializer = DoctorListSerializer(page, many=True, context={'request': request})
+    return paginator.get_paginated_response(serializer.data)
 
 
 @api_view(['GET', 'PATCH'])

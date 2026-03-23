@@ -9,9 +9,12 @@ import {
 import { updateDoctorStatus, getDoctorStatus } from '../services/medecinService';
 import { getDoctorRevenues, type RevenusData } from '../services/paymentService';
 import { useSocket } from '../hooks/useSocket';
+import { useAuth } from '../hooks/useAuth';
 import { Navbar } from '../components/ui/Navbar';
+import { CheckCircle, User } from 'lucide-react';
 
 export default function DoctorDashboard() {
+    const { user } = useAuth();
     const navigate = useNavigate();
     const [queue, setQueue] = useState<Consultation[]>([]);
     const [history, setHistory] = useState<Consultation[]>([]);
@@ -27,7 +30,7 @@ export default function DoctorDashboard() {
             .then(([q, s, h, r]) => {
                 setQueue(q);
                 // Bug #11 : n'afficher que les consultations terminées / annulées
-                setHistory(h.filter((c: Consultation) =>
+                setHistory(h.results.filter((c: Consultation) =>
                     c.status === 'COMPLETED' || c.status === 'CANCELLED'
                 ));
                 setRevenues(r);
@@ -87,18 +90,32 @@ export default function DoctorDashboard() {
                     alignItems: 'flex-start', marginBottom: '36px',
                     flexWrap: 'wrap', gap: '16px',
                 }}>
-                    <div>
-                        <h1 style={{
-                            fontFamily: 'var(--font-display)',
-                            fontSize: '26px', fontWeight: '700',
-                            marginBottom: '6px',
-                        }}>Mon espace</h1>
-                        <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-                            {queue.length === 0
-                                ? 'Aucun patient en attente'
-                                : `${queue.length} patient${queue.length > 1 ? 's' : ''} en attente`
-                            }
-                        </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        {user?.photo_url && (
+                            <img 
+                                src={user.photo_url} 
+                                alt="Profil médecin"
+                                style={{
+                                    width: '64px', height: '64px',
+                                    borderRadius: '50%',
+                                    objectFit: 'cover',
+                                    border: '2px solid var(--border)',
+                                }}
+                            />
+                        )}
+                        <div>
+                            <h1 style={{
+                                fontFamily: 'var(--font-display)',
+                                fontSize: '26px', fontWeight: '700',
+                                marginBottom: '6px',
+                            }}>Mon espace</h1>
+                            <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+                                {queue.length === 0
+                                    ? 'Aucun patient en attente'
+                                    : `${queue.length} patient${queue.length > 1 ? 's' : ''} en attente`
+                                }
+                            </p>
+                        </div>
                     </div>
 
                     <button
@@ -168,7 +185,7 @@ export default function DoctorDashboard() {
                             ))
                         ) : queue.length === 0 ? (
                             <div className="card-flat" style={{ padding: '48px', textAlign: 'center' }}>
-                                <p style={{ fontSize: '36px', marginBottom: '10px' }}>✅</p>
+                                <CheckCircle size={48} className="text-green-500 mx-auto" style={{ marginBottom: '10px' }} />
                                 <p style={{ fontWeight: '600', marginBottom: '4px' }}>Aucun patient en attente</p>
                                 <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Passez en ligne pour recevoir des consultations</p>
                             </div>
@@ -180,9 +197,9 @@ export default function DoctorDashboard() {
                                         width: '44px', height: '44px', flexShrink: 0,
                                         background: 'var(--green-50)', border: '1px solid var(--green-100)',
                                         borderRadius: '12px', display: 'flex', alignItems: 'center',
-                                        justifyContent: 'center', fontSize: '20px',
+                                        justifyContent: 'center',
                                     }}>
-                                        {c.patient_details.sexe === 'F' ? '👩' : '👨'}
+                                        <User size={24} className={c.patient_details.sexe === 'F' ? 'text-pink-500' : 'text-blue-500'} />
                                     </div>
                                     <div className="queue-item-content">
                                         <p style={{ fontWeight: '700', fontSize: '15px', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

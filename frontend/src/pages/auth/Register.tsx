@@ -3,19 +3,20 @@ import { useNavigate, Link } from 'react-router-dom';
 import { registerUser } from '../../services/authService';
 import { Spinner } from '../../components/ui/Spinner';
 import { useToast } from '../../hooks/useToast';
+import { Stethoscope, Pill, ImagePlus } from 'lucide-react';
 
 type Role = 'MEDECIN' | 'PHARMACIEN';
 
-const ROLES: { id: Role; icon: string; title: string; desc: string }[] = [
+const ROLES: { id: Role; icon: React.ReactNode; title: string; desc: string }[] = [
     {
         id: 'MEDECIN',
-        icon: '🩺',
+        icon: <Stethoscope size={28} />,
         title: 'Médecin',
         desc: 'Consultations en ligne',
     },
     {
         id: 'PHARMACIEN',
-        icon: '💊',
+        icon: <Pill size={28} />,
         title: 'Pharmacien',
         desc: 'Gérer la borne patient',
     },
@@ -25,6 +26,7 @@ export default function Register() {
     const navigate = useNavigate();
     const toast = useToast().toast;
     const [loading, setLoading] = useState(false);
+    const [imageFile, setImageFile] = useState<File | null>(null);
     const [form, setForm] = useState({
         email: '',
         password: '',
@@ -42,15 +44,32 @@ export default function Register() {
     const handleSubmit = async () => {
         setLoading(true);
         try {
-            await registerUser(form);
+            const fd = new FormData();
+            fd.append('email',     form.email);
+            fd.append('password',  form.password);
+            fd.append('nom',       form.nom);
+            fd.append('prenom',    form.prenom);
+            fd.append('role',      form.role);
+            fd.append('specialite',    form.specialite);
+            fd.append('numero_ordre',  form.numero_ordre);
+            fd.append('nom_pharmacie', form.nom_pharmacie);
+            if (imageFile) fd.append('image', imageFile);
+
+            await registerUser(fd);
             toast('Compte créé avec succès ! Vous pouvez maintenant vous connecter.', 'success');
-            // Petit délai pour laisser le toast s'afficher et stabiliser l'état
-            setTimeout(() => {
-                navigate('/login');
-            }, 1500);
+            setTimeout(() => { navigate('/login'); }, 1500);
         } catch (err: unknown) {
             const error = err as any;
-            const msg = error.response?.data?.email?.[0] || 'Erreur lors de la création du compte.';
+            const data = error.response?.data;
+            let msg = 'Erreur lors de la création du compte.';
+            if (data && typeof data === 'object') {
+                const firstKey = Object.keys(data)[0];
+                if (firstKey && Array.isArray(data[firstKey])) {
+                    msg = `${firstKey === 'non_field_errors' ? '' : firstKey + ' : '}${data[firstKey][0]}`;
+                } else if (typeof data.detail === 'string') {
+                    msg = data.detail;
+                }
+            }
             toast(msg, 'error');
         } finally {
             setLoading(false);
@@ -84,7 +103,7 @@ export default function Register() {
                         color: 'var(--text-secondary)',
                         fontSize: '14px',
                     }}>
-                        Rejoignez PharmaConsult
+                        Rejoignez Cpharma
                     </p>
                 </div>
 
@@ -112,7 +131,7 @@ export default function Register() {
                                     boxShadow: active ? 'var(--shadow-sm)' : 'none',
                                 }}
                             >
-                                <div style={{ fontSize: '28px', marginBottom: '8px' }}>
+                                <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'center', color: active ? 'var(--blue-600)' : 'var(--text-muted)' }}>
                                     {r.icon}
                                 </div>
                                 <p style={{
@@ -170,7 +189,7 @@ export default function Register() {
                     <div className="form-group">
                         <label className="label">Mot de passe</label>
                         <input className="input" type="password"
-                            placeholder="Minimum 6 caractères"
+                            placeholder="Minimum 10 caractères"
                             value={form.password}
                             onChange={e => set('password', e.target.value)} />
                     </div>
@@ -206,6 +225,28 @@ export default function Register() {
                                 onChange={e => set('nom_pharmacie', e.target.value)} />
                         </div>
                     )}
+
+                    {/* Upload photo */}
+                    <div className="form-group animate-fade-up">
+                        <label className="label">
+                            {form.role === 'MEDECIN' ? 'Photo de profil (optionnel)' : 'Photo de la pharmacie (optionnel)'}
+                        </label>
+                        <label style={{
+                            display: 'flex', alignItems: 'center', gap: '12px',
+                            padding: '10px 14px', borderRadius: 'var(--radius-md)',
+                            border: '1.5px dashed var(--border)',
+                            background: 'var(--bg-subtle)', cursor: 'pointer',
+                            fontSize: '13px', color: 'var(--text-secondary)',
+                            transition: 'border-color .2s',
+                        }}>
+                            <span style={{ display: 'flex', alignItems: 'center', color: 'var(--text-muted)' }}>
+                                <ImagePlus size={20} className="text-gray-400" />
+                            </span>
+                            {imageFile ? imageFile.name : 'Cliquer pour choisir une image…'}
+                            <input type="file" accept="image/*" style={{ display: 'none' }}
+                                onChange={e => setImageFile(e.target.files?.[0] ?? null)} />
+                        </label>
+                    </div>
 
                     {/* Bouton submit */}
                     <button

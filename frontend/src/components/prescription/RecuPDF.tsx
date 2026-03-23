@@ -38,7 +38,7 @@ export function RecuPDF({ payment }: { payment: Payment }) {
 
                 <View style={S.header}>
                     <Text style={S.title}>REÇU DE PAIEMENT</Text>
-                    <Text style={S.sub}>PharmaConsult — Téléconsultation médicale</Text>
+                    <Text style={S.sub}>Cpharma — Téléconsultation médicale</Text>
                     {/* Correction ici ↓ */}
                     <Text style={[S.sub, { marginTop: 8 }]}>Référence : {payment.id} — {date}</Text>
                 </View>
@@ -78,7 +78,7 @@ export function RecuPDF({ payment }: { payment: Payment }) {
                 </View>
 
                 <Text style={S.footer}>
-                    PharmaConsult — Document généré automatiquement — Non soumis à la TVA
+                    Cpharma — Document généré automatiquement — Non soumis à la TVA
                 </Text>
             </Page>
         </Document>

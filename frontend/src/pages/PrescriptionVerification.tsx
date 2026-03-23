@@ -4,6 +4,7 @@ import { verifyPrescription } from '../services/prescriptionService';
 import { verifySignature } from '../services/cryptoService';
 import { Navbar } from '../components/ui/Navbar';
 import { Spinner } from '../components/ui/Spinner';
+import { XCircle, CheckCircle } from 'lucide-react';
 
 export default function PrescriptionVerification() {
     const { hash } = useParams<{ hash: string }>();
@@ -75,9 +76,7 @@ export default function PrescriptionVerification() {
                             padding: '40px', textAlign: 'center',
                             marginBottom: '24px',
                         }}>
-                            <div style={{
-                                fontSize: '48px', marginBottom: '12px',
-                            }}>❌</div>
+                            <XCircle size={48} className="text-red-500 mx-auto mb-3" />
                             <p style={{
                                 fontFamily: 'var(--font-display)',
                                 fontSize: '20px', fontWeight: '700',
@@ -111,7 +110,7 @@ export default function PrescriptionVerification() {
                             padding: '28px', textAlign: 'center',
                             marginBottom: '24px',
                         }}>
-                            <div style={{ fontSize: '40px', marginBottom: '8px' }}>✅</div>
+                            <CheckCircle size={48} className="text-green-500 mx-auto mb-3" />
                             <p style={{
                                 fontFamily: 'var(--font-display)',
                                 fontSize: '18px', fontWeight: '700',

@@ -42,6 +42,7 @@ class DoctorProfile(models.Model):
         default=Decimal('50.00')
     )
     public_key        = models.TextField(blank=True, null=True)
+    photo             = models.ImageField(upload_to='doctors/photos/', null=True, blank=True)
 
     def __str__(self):
         return f'Dr. {self.user.nom}'
@@ -54,6 +55,7 @@ class PharmacistProfile(models.Model):
     )
     nom_pharmacie  = models.CharField(max_length=200, blank=True)
     adresse        = models.TextField(blank=True)
+    photo_pharmacie = models.ImageField(upload_to='pharmacies/photos/', null=True, blank=True)
 
     def __str__(self):
         return self.nom_pharmacie

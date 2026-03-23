@@ -58,6 +58,9 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         signature       = request.data.get('signature')
         sha256_hash     = request.data.get('sha256_hash')
         pdf_file        = request.FILES.get('pdf')
+        if pdf_file and not pdf_file.name.lower().endswith('.pdf'):
+            return Response({'detail': 'Seuls les fichiers PDF sont acceptés pour l\'ordonnance.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
         # Récupérer la clé publique du médecin depuis son profil
         medecin        = request.user

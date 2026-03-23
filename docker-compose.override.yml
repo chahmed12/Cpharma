@@ -14,17 +14,18 @@ services:
       - "8000:8000"
     environment:
       - DEBUG=True
+      - ALLOWED_HOSTS=localhost,127.0.0.1,[::1],backend
 
   frontend:
     # En dev, on n'utilise pas le build Nginx
     # On surcharge la commande pour utiliser le serveur de dev Vite
     build:
       context: ./frontend
+      target: build
     volumes:
       - ./frontend:/app:z
       - /app/node_modules
-    command: npm run dev -- --host 0.0.0.0 --port 5173
-    ports:
-      - "5173:5173"
+    command: npm run dev -- --host 0.0.0.0 --port 80
+    # Le port 80 est déjà mappé dans docker-compose.yml
     environment:
       - CHOKIDAR_USEPOLLING=true

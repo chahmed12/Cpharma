@@ -49,7 +49,7 @@ export function OrdonnancePDF({ data }: { data: OrdonnanceData }) {
                 )}
 
                 <View style={S.footer}>
-                    <Text>Document généré par PharmaConsult — Signé numériquement (RSA-PSS / SHA-256)</Text>
+                    <Text>Document généré par Cpharma — Signé numériquement (RSA-PSS / SHA-256)</Text>
                 </View>
             </Page>
         </Document>

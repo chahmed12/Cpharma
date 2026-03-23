@@ -8,12 +8,20 @@ export interface Doctor {
     prenom: string;
     specialite: string;
     status: DoctorStatus;
-    tarif_consultation?: string; // ex: "50.00"
+    tarif_consultation?: string;
+    photo?: string | null;
 }
 
-// Pharmacien : liste des médecins disponibles (ONLINE)
-export async function getAvailableDoctors(options?: { signal?: AbortSignal }): Promise<Doctor[]> {
-    const { data } = await api.get<Doctor[]>('/doctors/', options);
+export interface PaginatedDoctors {
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: Doctor[];
+}
+
+// Pharmacien : liste des médecins disponibles
+export async function getAvailableDoctors(page: number = 1, options?: { signal?: AbortSignal }): Promise<PaginatedDoctors> {
+    const { data } = await api.get<PaginatedDoctors>(`/doctors/?page=${page}`, options);
     return data;
 }
 

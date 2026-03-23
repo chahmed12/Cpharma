@@ -1,3 +1,5 @@
+import { Mic, MicOff, Video, VideoOff, PhoneOff } from 'lucide-react';
+
 interface VideoControlsProps {
     isMicOn: boolean;
     isCamOn: boolean;
@@ -34,7 +36,7 @@ export function VideoControls({
                     background: isMicOn ? '#374151' : '#ef4444',
                 }}
             >
-                {isMicOn ? '🎤' : '🔇'}
+                {isMicOn ? <Mic size={24} color="white" /> : <MicOff size={24} color="white" />}
             </button>
 
             {/* Caméra */}
@@ -46,7 +48,7 @@ export function VideoControls({
                     background: isCamOn ? '#374151' : '#ef4444',
                 }}
             >
-                {isCamOn ? '📹' : '🚫'}
+                {isCamOn ? <Video size={24} color="white" /> : <VideoOff size={24} color="white" />}
             </button>
 
             {/* Raccrocher */}
@@ -55,7 +57,7 @@ export function VideoControls({
                 title="Raccrocher"
                 style={{ ...btnBase, background: '#dc2626', width: '68px' }}
             >
-                📵
+                <PhoneOff size={28} color="white" />
             </button>
 
         </div>

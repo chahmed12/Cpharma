@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Spinner } from '../../components/ui/Spinner';
 import { useToast } from '../../hooks/useToast';
+import { Video, FileSignature, Zap, Hand } from 'lucide-react';
 
 export default function Login() {
     const { user, login } = useAuth();
@@ -84,22 +85,7 @@ export default function Login() {
                     borderRadius: '50%', bottom: '-60px', left: '-60px',
                 }} />
 
-                {/* Logo */}
-                <div style={{
-                    width: '72px', height: '72px',
-                    background: 'rgba(255,255,255,.15)',
-                    borderRadius: '20px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    marginBottom: '28px',
-                    border: '1px solid rgba(255,255,255,.2)',
-                    position: 'relative', zIndex: 1,
-                }}>
-                    <span style={{
-                        fontSize: '32px',
-                        fontFamily: 'var(--font-display)',
-                        color: '#fff',
-                    }}>✚</span>
-                </div>
+                <img src="/logo.svg" alt="Cpharma Logo" style={{ width: '120px', height: '120px', marginBottom: '16px', objectFit: 'contain', zIndex: 1, position: 'relative' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
 
                 <h1 style={{
                     fontFamily: 'var(--font-display)',
@@ -110,7 +96,7 @@ export default function Login() {
                     textAlign: 'center',
                     position: 'relative', zIndex: 1,
                 }}>
-                    PharmaConsult
+                    Cpharma
                 </h1>
 
                 <p style={{
@@ -133,9 +119,9 @@ export default function Login() {
                     position: 'relative', zIndex: 1,
                 }}>
                     {[
-                        { icon: '📹', text: 'Consultation vidéo sécurisée' },
-                        { icon: '📋', text: 'Ordonnances signées numériquement' },
-                        { icon: '⚡', text: 'Temps réel — médecins disponibles' },
+                        { icon: <Video size={16} />, text: 'Consultation vidéo sécurisée' },
+                        { icon: <FileSignature size={16} />, text: 'Ordonnances signées numériquement' },
+                        { icon: <Zap size={16} />, text: 'Temps réel — médecins disponibles' },
                     ].map((f, i) => (
                         <div key={i} style={{
                             display: 'flex', alignItems: 'center', gap: '10px',
@@ -144,7 +130,7 @@ export default function Login() {
                             padding: '10px 14px',
                             border: '1px solid rgba(255,255,255,.1)',
                         }}>
-                            <span style={{ fontSize: '16px' }}>{f.icon}</span>
+                            <span style={{ display: 'flex', alignItems: 'center', color: '#fff' }}>{f.icon}</span>
                             <span style={{ fontSize: '13px', color: 'rgba(255,255,255,.85)' }}>
                                 {f.text}
                             </span>
@@ -174,7 +160,12 @@ export default function Login() {
                             fontWeight: '700',
                             color: 'var(--text-primary)',
                             marginBottom: '6px',
-                        }}>Bon retour 👋</h2>
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                        }}>
+                            Bon retour <Hand size={24} className="text-blue-500" strokeWidth={2.5} />
+                        </h2>
                         <p style={{
                             color: 'var(--text-secondary)',
                             fontSize: '14px',

@@ -10,6 +10,7 @@ export interface AuthUser {
     prenom: string;
     role: Role;
     is_verified: boolean;
+    photo_url?: string;
 }
 
 interface AuthContextType {

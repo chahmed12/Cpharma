@@ -13,11 +13,11 @@ export default defineConfig({
     proxy: {
       // Proxy API vers Django en développement
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://backend:8000',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:8000',
+        target: 'ws://backend:8000',
         ws: true,
       },
     },

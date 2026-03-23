@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
+import { FileSignature } from 'lucide-react';
 
 /**
  * Page affichée côté Pharmacien après avoir raccroché,
@@ -38,8 +39,9 @@ export default function WaitingPrescription() {
                 fontSize: '32px',
                 boxShadow: '0 0 0 12px rgba(99,102,241,.12)',
                 animation: 'pulse 2s infinite ease-in-out',
+                color: 'white',
             }}>
-                📋
+                <FileSignature size={36} />
             </div>
 
             <div>

@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Navbar } from '../components/ui/Navbar';
 import { Spinner } from '../components/ui/Spinner';
 import { useToast } from '../hooks/useToast';
+import { AlertTriangle, FileText } from 'lucide-react';
 
 export interface Medicament {
     id: string;
@@ -126,8 +127,8 @@ export default function PrescriptionForm() {
                         </div>
                         {patient.medical_record && (patient.medical_record.allergies || patient.medical_record.antecedents) && (
                             <div style={{ borderTop: '1px solid var(--blue-200)', paddingTop: '10px', marginTop: '10px' }}>
-                                {patient.medical_record.allergies && <p style={{ fontSize: '13px', color: 'var(--red-600)' }}>⚠️ <strong>Allergies :</strong> {patient.medical_record.allergies}</p>}
-                                {patient.medical_record.antecedents && <p style={{ fontSize: '13px', color: 'var(--blue-800)' }}>📋 <strong>Antécédents :</strong> {patient.medical_record.antecedents}</p>}
+                                {patient.medical_record.allergies && <p style={{ fontSize: '13px', color: 'var(--red-600)', display: 'flex', alignItems: 'center' }}><AlertTriangle className="mr-1" size={16} /> <strong>Allergies :</strong> {patient.medical_record.allergies}</p>}
+                                {patient.medical_record.antecedents && <p style={{ fontSize: '13px', color: 'var(--blue-800)', display: 'flex', alignItems: 'center' }}><FileText className="mr-1" size={16} /> <strong>Antécédents :</strong> {patient.medical_record.antecedents}</p>}
                             </div>
                         )}
                     </div>

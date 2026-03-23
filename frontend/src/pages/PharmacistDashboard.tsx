@@ -6,6 +6,7 @@ import { getHistory, type Consultation }
     from '../services/consultationService';
 import { useSocket } from '../hooks/useSocket';
 import { Navbar } from '../components/ui/Navbar';
+import { Stethoscope } from 'lucide-react';
 
 // ── Composant skeleton card ────────────────────────
 function SkeletonCard() {
@@ -46,17 +47,29 @@ function DoctorCard({ doc, index, onStart }: {
                 alignItems: 'flex-start',
                 marginBottom: '14px',
             }}>
-                {/* Avatar initiales */}
-                <div style={{
-                    width: '44px', height: '44px',
-                    background: 'linear-gradient(135deg, var(--blue-600), #6366f1)',
-                    borderRadius: '12px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#fff', fontWeight: '700', fontSize: '15px',
-                    flexShrink: 0,
-                }}>
-                    {(doc.prenom?.[0] || '?')}{(doc.nom?.[0] || '?')}
-                </div>
+                {/* Avatar : photo si disponible, sinon initiales */}
+                {doc.photo ? (
+                    <img
+                        src={doc.photo}
+                        alt={`Dr. ${doc.prenom} ${doc.nom}`}
+                        style={{
+                            width: '44px', height: '44px', flexShrink: 0,
+                            borderRadius: '12px', objectFit: 'cover',
+                            border: '2px solid var(--border)',
+                        }}
+                    />
+                ) : (
+                    <div style={{
+                        width: '44px', height: '44px',
+                        background: 'linear-gradient(135deg, var(--blue-600), #6366f1)',
+                        borderRadius: '12px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#fff', fontWeight: '700', fontSize: '15px',
+                        flexShrink: 0,
+                    }}>
+                        {(doc.prenom?.[0] || '?')}{(doc.nom?.[0] || '?')}
+                    </div>
+                )}
 
                 {/* Badge statut */}{/* Point pulsant pour online */}
                 <span className={badgeClass}>
@@ -128,15 +141,20 @@ export default function PharmacistDashboard() {
     const navigate = useNavigate();
     const [doctors, setDoctors] = useState<Doctor[]>([]);
     const [history, setHistory] = useState<Consultation[]>([]);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const controller = new AbortController();
         const opts = { signal: controller.signal };
-        Promise.all([getAvailableDoctors(opts), getHistory(opts)]).then(([d, h]) => {
-            setDoctors(d);
+        setLoading(true);
+        Promise.all([getAvailableDoctors(1, opts), getHistory(opts)]).then(([d, h]) => {
+            setDoctors(d.results);
+            setHasMore(!!d.next);
             // Bug #11 : n'afficher que les consultations terminées / annulées
-            setHistory(h.filter((c: Consultation) =>
+            setHistory(h.results.filter((c: Consultation) =>
                 c.status === 'COMPLETED' || c.status === 'CANCELLED'
             ));
         })
@@ -148,6 +166,22 @@ export default function PharmacistDashboard() {
         
         return () => controller.abort();
     }, []);
+
+    const loadMoreDoctors = async () => {
+        if (!hasMore || loadingMore) return;
+        setLoadingMore(true);
+        try {
+            const nextPage = page + 1;
+            const res = await getAvailableDoctors(nextPage);
+            setDoctors(prev => [...prev, ...res.results]);
+            setHasMore(!!res.next);
+            setPage(nextPage);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoadingMore(false);
+        }
+    };
 
     // Redirection automatique quand l'ordonnance est prête
     useSocket('prescription_ready', (data: unknown) => {
@@ -210,7 +244,7 @@ export default function PharmacistDashboard() {
                             </div>
                         ) : doctors.length === 0 ? (
                             <div key="docs-empty" className="card-flat" style={{ padding: '48px', textAlign: 'center', gridColumn: '1 / -1' }}>
-                                <p style={{ fontSize: '36px', marginBottom: '10px' }}>🩺</p>
+                                <Stethoscope size={48} className="text-gray-400 mx-auto" style={{ marginBottom: '10px' }} />
                                 <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Aucun médecin enregistré pour le moment</p>
                             </div>
                         ) : (
@@ -219,6 +253,18 @@ export default function PharmacistDashboard() {
                             </div>
                         )}
                     </div>
+
+                    {hasMore && (
+                        <div style={{ textAlign: 'center', marginTop: '24px' }}>
+                            <button 
+                                className="btn btn-secondary" 
+                                onClick={loadMoreDoctors} 
+                                disabled={loadingMore}
+                            >
+                                {loadingMore ? 'Chargement...' : 'Voir plus de médecins'}
+                            </button>
+                        </div>
+                    )}
                 </section>
 
                 {/* Section historique */}

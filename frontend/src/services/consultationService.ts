@@ -25,8 +25,15 @@ export async function createConsultation(payload: CreatePayload): Promise<Consul
     return data;
 }
 
-export async function getHistory(options?: { signal?: AbortSignal }): Promise<Consultation[]> {
-    const { data } = await api.get<Consultation[]>('/consultations/', options);
+export interface PaginatedResponse<T> {
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: T[];
+}
+
+export async function getHistory(options?: { signal?: AbortSignal }): Promise<PaginatedResponse<Consultation>> {
+    const { data } = await api.get<PaginatedResponse<Consultation>>('/consultations/', options);
     return data;
 }
 

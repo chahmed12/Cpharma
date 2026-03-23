@@ -5,6 +5,7 @@ import { searchPatients, createPatient, type Patient } from '../services/patient
 import { Navbar } from '../components/ui/Navbar';
 import { Spinner } from '../components/ui/Spinner';
 import { useToast } from '../hooks/useToast';
+import { Stethoscope } from 'lucide-react';
 
 export default function NewConsultation() {
     const navigate = useNavigate();
@@ -92,8 +93,8 @@ export default function NewConsultation() {
             <div className="page-content-narrow">
                 {selectedDoctor && (
                     <div style={{ marginBottom: '20px', padding: '12px', background: 'var(--blue-50)', borderRadius: '8px', border: '1px solid var(--blue-100)' }}>
-                        <p style={{ margin: 0, color: 'var(--blue-800)', fontWeight: 'bold' }}>
-                            👨‍⚕️ Nouvelle consultation avec le Dr. {selectedDoctor.prenom} {selectedDoctor.nom}
+                        <p style={{ margin: 0, color: 'var(--blue-800)', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
+                            <Stethoscope className="inline mr-2" size={20} /> Nouvelle consultation avec le Dr. {selectedDoctor.prenom} {selectedDoctor.nom}
                         </p>
                     </div>
                 )}

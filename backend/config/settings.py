@@ -15,6 +15,8 @@ ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(',') if host.s
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
 INSTALLED_APPS = [
+    'daphne',
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -36,6 +38,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -123,7 +126,7 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = False # Jamais True en prod !
 CORS_ALLOW_CREDENTIALS = True
 
-cors_origins_env = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost')
+cors_origins_env = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost,http://127.0.0.1,http://localhost:5173')
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_env.split(',') if origin.strip()]
 
 # Sécurité des cookies JWT

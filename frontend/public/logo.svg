@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200" width="100%" height="100%">
+  <defs>
+    <!-- Define the gradient for the green elements -->
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22c55e" />
+      <stop offset="100%" stop-color="#16a34a" />
+    </linearGradient>
+    <style>
+      .c-arc { fill: none; stroke: url(#greenGrad); stroke-width: 24; stroke-linecap: round; }
+      .cross { fill: url(#greenGrad); }
+      .leaf { fill: white; }
+      .text-c { font-family: 'Fraunces', 'DM Sans', sans-serif; font-size: 80px; font-weight: 800; fill: url(#greenGrad); }
+      .text-pharma { font-family: 'Fraunces', 'DM Sans', sans-serif; font-size: 80px; font-weight: 800; fill: #1e3a8a; }
+      .text-sub { font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 700; fill: #1e3a8a; letter-spacing: 1.5px; }
+    </style>
+  </defs>
+
+  <!-- Left Icon Group -->
+  <g transform="translate(20, 10)">
+    <!-- Outer C Arc -->
+    <!-- Center is around (80, 90), radius 70. Start roughly at 45 degrees, end at -45 degrees, sweeping left -->
+    <path class="c-arc" d="M 130 30 A 70 70 0 1 0 130 150" />
+    
+    <!-- Inner Cross -->
+    <!-- Center of cross: x=80, y=90 -->
+    <path class="cross" d="
+      M 65 50
+      L 95 50
+      C 100 50, 100 55, 100 60
+      L 100 75
+      L 115 75
+      C 120 75, 125 75, 125 80
+      L 125 100
+      C 125 105, 120 105, 115 105
+      L 100 105
+      L 100 120
+      C 100 125, 100 130, 95 130
+      L 65 130
+      C 60 130, 60 125, 60 120
+      L 60 105
+      L 45 105
+      C 40 105, 35 105, 35 100
+      L 35 80
+      C 35 75, 40 75, 45 75
+      L 60 75
+      L 60 60
+      C 60 55, 60 50, 65 50
+      Z
+    " />
+
+    <!-- Negative space Leaf (carved out of the cross) -->
+    <!-- Positioned in the bottom right corner of the cross -->
+    <path class="leaf" d="
+      M 80 120
+      C 85 110, 100 95, 115 95
+      C 110 115, 95 120, 80 120
+      Z
+    " />
+  </g>
+
+  <!-- Right Text Group -->
+  <g transform="translate(200, 105)">
+    <!-- Main text 'Cpharma' -->
+    <text x="0" y="0" class="text-c">C</text>
+    <text x="56" y="0" class="text-pharma">pharma</text>
+  </g>
+
+  <g transform="translate(200, 140)">
+    <!-- Sub text -->
+    <text x="0" y="0" class="text-sub">CONSULTATION EN PHARMACIE EN LIGNE</text>
+  </g>
+
+</svg>
