@@ -224,7 +224,8 @@ def me(request):
 def doctors_online(request):
     """Retourne la liste des médecins actuellement en ligne (status=ONLINE)."""
     profiles = DoctorProfile.objects.filter(status='ONLINE').select_related('user')
-    return Response(DoctorListSerializer(profiles, many=True).data, status=status.HTTP_200_OK)
+    serializer = DoctorListSerializer(profiles, many=True, context={'request': request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -304,12 +305,18 @@ def update_public_key(request):
 
     public_key = request.data.get('public_key', '').strip()
 
-    # Validation basique : la clé PEM commence par "-----BEGIN"
-    if not public_key or not public_key.startswith('-----BEGIN') or len(public_key) < 100:
+    if not public_key or len(public_key) < 50:
         return Response(
-            {'detail': 'Clé publique invalide. Format PEM attendu.'},
+            {'detail': 'Clé publique invalide ou trop courte.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    # Si c'est du Base64 brut (sans les headers PEM), on l'enveloppe
+    if not public_key.startswith('-----BEGIN'):
+        # On nettoie les éventuels espaces/newlines pour normaliser
+        pk_clean = "".join(public_key.split())
+        public_key = f"-----BEGIN PUBLIC KEY-----\n{pk_clean}\n-----END PUBLIC KEY-----"
+
 
     try:
         profile = request.user.doctorprofile

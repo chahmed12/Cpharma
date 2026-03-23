@@ -17,7 +17,7 @@ const ROLES: { id: Role; icon: React.ReactNode; title: string; desc: string }[] 
     {
         id: 'PHARMACIEN',
         icon: <Pill size={28} />,
-        title: 'Pharmacien',
+        title: 'Espace Pharmacie',
         desc: 'Gérer la borne patient',
     },
 ];
@@ -163,13 +163,17 @@ export default function Register() {
                         gap: '10px',
                     }}>
                         <div className="form-group">
-                            <label className="label">Prénom</label>
+                            <label className="label">
+                                {form.role === 'MEDECIN' ? 'Prénom' : 'Prénom du pharmacien'}
+                            </label>
                             <input className="input" placeholder="Ahmed"
                                 value={form.prenom}
                                 onChange={e => set('prenom', e.target.value)} />
                         </div>
                         <div className="form-group">
-                            <label className="label">Nom</label>
+                            <label className="label">
+                                {form.role === 'MEDECIN' ? 'Nom' : 'Nom du pharmacien'}
+                            </label>
                             <input className="input" placeholder="Benali"
                                 value={form.nom}
                                 onChange={e => set('nom', e.target.value)} />
