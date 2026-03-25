@@ -42,6 +42,6 @@ jobs:
           cd backend
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          python manage.py makemigrations
-          python manage.py migrate
-          python manage.py test
+          python manage.py makemigrations --settings=config.test_settings
+          python manage.py migrate --settings=config.test_settings
+          python manage.py test --settings=config.test_settings
