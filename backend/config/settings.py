@@ -21,6 +21,10 @@ ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(",") if host.s
 
 AUTH_USER_MODEL = "accounts.CustomUser"
 
+AUTHENTICATION_BACKENDS = [
+    "apps.accounts.backends.EmailBackend",
+]
+
 INSTALLED_APPS = [
     "daphne",
     "channels",
