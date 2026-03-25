@@ -208,10 +208,11 @@ def refresh_token_view(request):
 
         # Rotation : on génère de nouvelles données pour le refresh token
         if settings.SIMPLE_JWT.get("ROTATE_REFRESH_TOKENS", False):
-            from rest_framework_simplejwt.tokens import RefreshToken
-
             old_refresh = RefreshToken(raw_refresh)
-            old_refresh.blacklist()
+            try:
+                old_refresh.blacklist()
+            except AttributeError:
+                pass
             user_obj = User.objects.get(id=old_refresh.payload["user_id"])
             refresh = RefreshToken.for_user(user_obj)
 
