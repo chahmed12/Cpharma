@@ -230,13 +230,18 @@ class RefreshTokenTests(APITestCase):
     def setUp(self):
         self.user = _make_user(email="refresh@test.com", active=True)
         # On se connecte pour obtenir les cookies
-        self.client.post(
+        login_res = self.client.post(
             LOGIN_URL,
             {
                 "email": "refresh@test.com",
                 "password": VALID_PASSWORD,
             },
             format="json",
+        )
+        self.assertEqual(
+            login_res.status_code,
+            status.HTTP_200_OK,
+            f"Login failed: {login_res.status_code} - {login_res.data}",
         )
 
     def test_refresh_with_valid_cookie_returns_200(self):
@@ -260,13 +265,18 @@ class RefreshTokenTests(APITestCase):
 class LogoutAndMeTests(APITestCase):
     def setUp(self):
         self.user = _make_user(email="logoutme@test.com", active=True)
-        self.client.post(
+        login_res = self.client.post(
             LOGIN_URL,
             {
                 "email": "logoutme@test.com",
                 "password": VALID_PASSWORD,
             },
             format="json",
+        )
+        self.assertEqual(
+            login_res.status_code,
+            status.HTTP_200_OK,
+            f"Login failed: {login_res.status_code} - {login_res.data}",
         )
 
     def test_me_returns_user_data(self):
