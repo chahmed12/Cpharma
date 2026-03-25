@@ -9,7 +9,11 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_THROTTLE_CLASSES": [],  # Disable throttling in tests
-    "DEFAULT_THROTTLE_RATES": {},
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "999/minute",
+        "user": "999/minute",
+        "login": "999/minute",  # For LoginRateThrottle
+    },
 }
 
 # Disable secure cookies in tests (HTTP, not HTTPS)
