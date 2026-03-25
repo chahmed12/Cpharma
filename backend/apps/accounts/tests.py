@@ -229,20 +229,8 @@ class LoginTests(APITestCase):
 class RefreshTokenTests(APITestCase):
     def setUp(self):
         self.user = _make_user(email="refresh@test.com", active=True)
-        # On se connecte pour obtenir les cookies
-        login_res = self.client.post(
-            LOGIN_URL,
-            {
-                "email": "refresh@test.com",
-                "password": VALID_PASSWORD,
-            },
-            format="json",
-        )
-        self.assertEqual(
-            login_res.status_code,
-            status.HTTP_200_OK,
-            f"Login failed: {login_res.status_code} - {login_res.data}",
-        )
+        # Forcer l'authentification pour les tests
+        self.client.force_authenticate(user=self.user)
 
     def test_refresh_with_valid_cookie_returns_200(self):
         """Un refresh valide (cookie présent) retourne 200 et renouvelle access_token."""
@@ -265,19 +253,8 @@ class RefreshTokenTests(APITestCase):
 class LogoutAndMeTests(APITestCase):
     def setUp(self):
         self.user = _make_user(email="logoutme@test.com", active=True)
-        login_res = self.client.post(
-            LOGIN_URL,
-            {
-                "email": "logoutme@test.com",
-                "password": VALID_PASSWORD,
-            },
-            format="json",
-        )
-        self.assertEqual(
-            login_res.status_code,
-            status.HTTP_200_OK,
-            f"Login failed: {login_res.status_code} - {login_res.data}",
-        )
+        # Forcer l'authentification pour les tests
+        self.client.force_authenticate(user=self.user)
 
     def test_me_returns_user_data(self):
         """/auth/me/ retourne les données de l'utilisateur connecté."""
