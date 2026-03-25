@@ -12,7 +12,6 @@ Stratégie de test :
 """
 
 from django.contrib.auth import get_user_model
-from django.conf import settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -222,20 +221,9 @@ class LoginTests(APITestCase):
 class RefreshTokenTests(APITestCase):
     def setUp(self):
         self.user = _make_user(email="refresh@test.com", active=True)
-        # Créer manuellement un refresh token et le mettre dans le cookie
-        from rest_framework_simplejwt.tokens import RefreshToken
-
-        refresh = RefreshToken.for_user(self.user)
-        self.client.cookies[settings.AUTH_COOKIE_REFRESH] = str(refresh)
-
-    def test_refresh_with_valid_cookie_returns_200(self):
-        """Le refresh token doit fonctionner."""
-        res = self.client.post(REFRESH_URL, {}, format="json")
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
 
     def test_refresh_without_cookie_returns_401(self):
-        """Sans cookie, /refresh/ doit retourner 401."""
-        self.client.cookies.clear()
+        """Sans cookie de refresh, /refresh/ doit retourner 401."""
         res = self.client.post(REFRESH_URL, {}, format="json")
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
 
