@@ -19,7 +19,7 @@ export function RevenusSection() {
             <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="bg-white border rounded-xl p-4 text-center">
                     <p className="text-3xl font-bold text-green-600">
-                        {data.total_net} DA
+                        {data.total_net} DNT
                     </p>
                     <p className="text-sm text-gray-400 mt-1">Net total</p>
                 </div>
@@ -31,7 +31,7 @@ export function RevenusSection() {
                 </div>
                 <div className="bg-white border rounded-xl p-4 text-center">
                     <p className="text-3xl font-bold text-gray-500">
-                        {data.total_brut} DA
+                        {data.total_brut} DNT
                     </p>
                     <p className="text-sm text-gray-400 mt-1">Brut total</p>
                 </div>

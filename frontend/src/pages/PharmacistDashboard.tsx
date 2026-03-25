@@ -113,7 +113,7 @@ function DoctorCard({ doc, index, onStart }: {
                 display: 'inline-block',
                 marginBottom: '16px',
             }}>
-                {doc.tarif_consultation ? `${doc.tarif_consultation} DA / consultation` : 'Tarif non défini'}
+                {doc.tarif_consultation ? `${doc.tarif_consultation} DNT / consultation` : 'Tarif non défini'}
             </p>
 
             {/* Bouton action */}

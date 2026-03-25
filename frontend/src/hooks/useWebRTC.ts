@@ -12,8 +12,8 @@ const ICE_SERVERS = {
         ...(import.meta.env.VITE_TURN_URL ? [{
             urls: import.meta.env.VITE_TURN_URL,
             username: import.meta.env.VITE_TURN_USERNAME,
-            credential: import.meta.env.VITE_TURN_CREDENTIAL
-        }] : [])
+            credential: import.meta.env.VITE_TURN_CREDENTIAL,
+        }] : []),
     ],
 };
 
@@ -23,7 +23,10 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
-    
+
+    // FIX : pingInterval exposé en ref pour pouvoir le stopper depuis hangUp
+    const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
     const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>('new');
     const [isMicOn, setIsMicOn] = useState(true);
     const [isCamOn, setIsCamOn] = useState(true);
@@ -36,19 +39,19 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
         let peerConnected = false;
         let offerSent = false;
 
-        // Bug VID-2 fix : URL dynamique (Nginx gère le reverse proxy en prod)
         let wsUrl = import.meta.env.VITE_WS_URL;
         if (!wsUrl) {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             wsUrl = `${protocol}//${window.location.host}/ws`;
         }
+
         const ws = new WebSocket(`${wsUrl}/webrtc/${consultationId}/`);
         wsRef.current = ws;
 
         const pc = new RTCPeerConnection(ICE_SERVERS);
         pcRef.current = pc;
 
-        // --- HANDLERS MEDIA ---
+        // ── Handlers média ───────────────────────────────────────────────────
         pc.ontrack = (event) => {
             if (remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
         };
@@ -61,10 +64,10 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
 
         pc.onconnectionstatechange = () => setConnectionState(pc.connectionState);
 
-        // --- ORCHESTRATION ---
+        // ── Orchestration ────────────────────────────────────────────────────
         const maybeStartCall = async () => {
             if (isCaller && localMediaReady && peerConnected && !offerSent) {
-                offerSent = true; // Empêche l'envoi en boucle
+                offerSent = true;
                 try {
                     const offer = await pc.createOffer();
                     await pc.setLocalDescription(offer);
@@ -75,11 +78,8 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
             }
         };
 
-        // Envoi régulier d'un ping tant que l'autre n'a pas répondu ou que l'offre n'est pas envoyée
-        // SOL-QC-3 : Le ping/pong est un mécanisme de peer discovery pour détecter quand l'autre
-        // participant rejoint le canal de signaling, distinct du ICE connectivity check qui
-        // intervient après l'échange SDP.
-        const pingInterval = setInterval(() => {
+        // FIX : on stocke l'intervalle dans la ref pour que hangUp puisse le stopper
+        pingIntervalRef.current = setInterval(() => {
             if (ws.readyState === WebSocket.OPEN && !offerSent && pc.signalingState === 'stable') {
                 ws.send(JSON.stringify({ type: 'ping' }));
             }
@@ -87,7 +87,7 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
 
         ws.onmessage = async (event) => {
             const { type, data } = JSON.parse(event.data);
-            
+
             if (type === 'ping') {
                 ws.send(JSON.stringify({ type: 'pong' }));
                 peerConnected = true;
@@ -122,7 +122,7 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
             }
         };
 
-        // Initialisation de la caméra/micro avant toute communication
+        // ── Initialisation média ──────────────────────────────────────────────
         const initMedia = async () => {
             try {
                 let stream: MediaStream;
@@ -142,13 +142,10 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
 
                 localStreamRef.current = stream;
                 if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-                
-                // Ajout des pistes au PeerConnection
                 stream.getTracks().forEach(track => pc.addTrack(track, stream));
-                
+
                 localMediaReady = true;
                 maybeStartCall();
-
             } catch (criticalErr) {
                 console.error("Erreur critique d'accès aux médias", criticalErr);
                 setTimeout(() => alert("Impossible d'accéder au micro. Veuillez vérifier vos permissions."), 1000);
@@ -157,9 +154,14 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
 
         initMedia();
 
+        // ── Cleanup au démontage ──────────────────────────────────────────────
         return () => {
             isMounted = false;
-            clearInterval(pingInterval);
+            // FIX : on stoppe l'intervalle via la ref
+            if (pingIntervalRef.current) {
+                clearInterval(pingIntervalRef.current);
+                pingIntervalRef.current = null;
+            }
             ws.close();
             pc.close();
             localStreamRef.current?.getTracks().forEach(t => t.stop());
@@ -167,29 +169,37 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
     }, [consultationId, isCaller]);
 
     const toggleMic = useCallback(() => {
-        localStreamRef.current?.getAudioTracks().forEach(t => t.enabled = !t.enabled);
+        localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = !t.enabled; });
         setIsMicOn(prev => !prev);
     }, []);
 
     const toggleCam = useCallback(() => {
-        localStreamRef.current?.getVideoTracks().forEach(t => t.enabled = !t.enabled);
+        localStreamRef.current?.getVideoTracks().forEach(t => { t.enabled = !t.enabled; });
         setIsCamOn(prev => !prev);
     }, []);
 
     const hangUp = useCallback(() => {
+        // FIX : stopper le pingInterval immédiatement lors du hangUp
+        // sans attendre le démontage du composant
+        if (pingIntervalRef.current) {
+            clearInterval(pingIntervalRef.current);
+            pingIntervalRef.current = null;
+        }
+
         if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({ type: 'hangup', data: {} }));
         }
+
         pcRef.current?.close();
-        
-        // Bug VID-3 fix : Timeout pour laisser le message 'hangup' partir
+
+        // Timeout pour laisser le message 'hangup' partir avant de fermer le WS
         setTimeout(() => wsRef.current?.close(), 300);
-        
+
         localStreamRef.current?.getTracks().forEach(t => t.stop());
     }, []);
 
-    return { 
-        localVideoRef, remoteVideoRef, connectionState, 
-        isMicOn, isCamOn, toggleMic, toggleCam, hangUp 
+    return {
+        localVideoRef, remoteVideoRef, connectionState,
+        isMicOn, isCamOn, toggleMic, toggleCam, hangUp,
     };
 }

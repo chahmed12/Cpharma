@@ -1,42 +1,35 @@
 from django.db import models
 from fernet_fields import EncryptedTextField, EncryptedCharField
 
-# --- Monkey patch pour corriger le bug de django-fernet-fields-v2 sous Python 3.11+ ---
-from django.utils.encoding import force_bytes, force_str
-from fernet_fields.fields import EncryptedField
-
-def patched_from_db_value(self, value, expression, connection, *args):
-    if value is not None:
-        # Au lieu de value = bytes(value) qui échoue sur les chaînes en Python 3
-        value = force_bytes(value)
-        return self.to_python(force_str(self.fernet.decrypt(value)))
-
-EncryptedField.from_db_value = patched_from_db_value
-# ------------------------------------------------------------------------------------
 
 class Patient(models.Model):
     class Sexe(models.TextChoices):
-        MASCULIN = 'M', 'Masculin'
-        FEMININ  = 'F', 'Féminin'
+        MASCULIN = "M", "Masculin"
+        FEMININ = "F", "Féminin"
 
-    nom            = models.CharField(max_length=100)
-    prenom         = models.CharField(max_length=100)
-    telephone      = models.CharField(max_length=20, unique=True)
+    nom = models.CharField(max_length=100)
+    prenom = models.CharField(max_length=100)
+    telephone = models.CharField(max_length=20, unique=True)
     date_naissance = models.DateField()
-    sexe           = models.CharField(max_length=1, choices=Sexe.choices, default=Sexe.MASCULIN)
-    adresse        = models.TextField(blank=True)
-    created_at     = models.DateTimeField(auto_now_add=True)
+    sexe = models.CharField(max_length=1, choices=Sexe.choices, default=Sexe.MASCULIN)
+    adresse = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.prenom} {self.nom} ({self.telephone})"
 
+
 class MedicalRecord(models.Model):
-    patient            = models.OneToOneField(Patient, on_delete=models.CASCADE, related_name='medical_record')
-    allergies          = EncryptedTextField(blank=True, help_text="Ex: Pénicilline, Aspirine...")
-    antecedents        = EncryptedTextField(blank=True, help_text="Maladies chroniques, opérations...")
-    groupe_sanguin     = EncryptedCharField(max_length=5, blank=True)
-    poids              = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
-    taille             = models.PositiveIntegerField(null=True, blank=True) # en cm
+    patient = models.OneToOneField(
+        Patient, on_delete=models.CASCADE, related_name="medical_record"
+    )
+    allergies = EncryptedTextField(blank=True, help_text="Ex: Pénicilline, Aspirine...")
+    antecedents = EncryptedTextField(
+        blank=True, help_text="Maladies chroniques, opérations..."
+    )
+    groupe_sanguin = EncryptedCharField(max_length=5, blank=True)
+    poids = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    taille = models.PositiveIntegerField(null=True, blank=True)
     derniere_mise_a_jour = models.DateTimeField(auto_now=True)
 
     def __str__(self):

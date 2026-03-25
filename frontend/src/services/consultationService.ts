@@ -6,9 +6,9 @@ export type ConsultationStatus =
 
 export interface Consultation {
     id: number;
-    medecin: number;
-    pharmacien: number;
-    patient_details: Patient; // Nouveau champ lié
+    medecin_id: number;
+    pharmacien_id: number;
+    patient_details: Patient;
     status: ConsultationStatus;
     created_at: string;
     motif: string;
@@ -32,7 +32,7 @@ export interface PaginatedResponse<T> {
     results: T[];
 }
 
-export async function getHistory(options?: { signal?: AbortSignal }): Promise<PaginatedResponse<Consultation>> {
+export async function getHistory(options?: { signal?: AbortSignal; params?: Record<string, string> }): Promise<PaginatedResponse<Consultation>> {
     const { data } = await api.get<PaginatedResponse<Consultation>>('/consultations/', options);
     return data;
 }

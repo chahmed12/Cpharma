@@ -1,6 +1,6 @@
-from django.contrib            import admin
+from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models                   import CustomUser, DoctorProfile, PharmacistProfile
+from .models import CustomUser, DoctorProfile, PharmacistProfile
 
 
 class DoctorProfileInline(admin.StackedInline):
@@ -15,45 +15,75 @@ class PharmacistProfileInline(admin.StackedInline):
 
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
-    list_display   = ['email', 'nom', 'prenom', 'role', 'is_verified', 'is_active', 'is_staff']
-    list_filter    = ['role', 'is_verified', 'is_active', 'is_staff']
-    list_editable  = ['is_verified']
-    search_fields  = ['email', 'nom', 'prenom']
-    ordering       = ['email']
+    list_display = [
+        "email",
+        "nom",
+        "prenom",
+        "role",
+        "is_verified",
+        "is_active",
+        "is_staff",
+    ]
+    list_filter = ["role", "is_verified", "is_active", "is_staff"]
+    list_editable = ["is_verified"]
+    search_fields = ["email", "nom", "prenom"]
+    ordering = ["email"]
 
-    # ← Remplacer username par email partout
     fieldsets = (
-        (None,           {'fields': ('email', 'password')}),
-        ('Informations', {'fields': ('nom', 'prenom', 'role', 'is_verified')}),
-        ('Permissions',  {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
-        ('Dates',        {'fields': ('last_login', 'date_joined')}),
+        (None, {"fields": ("email",)}),
+        ("Informations", {"fields": ("nom", "prenom", "role", "is_verified")}),
+        (
+            "Permissions",
+            {
+                "fields": (
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                )
+            },
+        ),
+        ("Dates", {"fields": ("last_login", "date_joined")}),
     )
     add_fieldsets = (
-        (None, {
-            'classes': ('wide',),
-            'fields':  ('email', 'nom', 'prenom', 'role', 'password1', 'password2'),
-        }),
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": ("email", "nom", "prenom", "role"),
+            },
+        ),
+    )
+    add_fieldsets = (
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": ("email", "nom", "prenom", "role", "password1", "password2"),
+            },
+        ),
     )
 
     def get_inlines(self, request, obj=None):
         if obj is None:
             return []
-        if obj.role == 'MEDECIN':
+        if obj.role == "MEDECIN":
             return [DoctorProfileInline]
-        if obj.role == 'PHARMACIEN':
+        if obj.role == "PHARMACIEN":
             return [PharmacistProfileInline]
         return []
 
 
 @admin.register(DoctorProfile)
 class DoctorProfileAdmin(admin.ModelAdmin):
-    list_display  = ['user', 'specialite', 'status', 'tarif_consultation']
-    list_filter   = ['status']
-    list_editable = ['status']
-    search_fields = ['user__nom', 'user__email']
+    list_display = ["user", "specialite", "status", "tarif_consultation"]
+    list_filter = ["status"]
+    list_editable = ["status"]
+    search_fields = ["user__nom", "user__email"]
 
 
 @admin.register(PharmacistProfile)
 class PharmacistProfileAdmin(admin.ModelAdmin):
-    list_display  = ['user', 'nom_pharmacie']
-    search_fields = ['user__nom', 'nom_pharmacie']
+    list_display = ["user", "nom_pharmacie"]
+    search_fields = ["user__nom", "nom_pharmacie"]

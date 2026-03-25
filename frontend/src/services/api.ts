@@ -24,11 +24,10 @@ api.interceptors.response.use(
                 await axios.post(`${getBaseUrl()}/auth/token/refresh/`, {}, { withCredentials: true });
                 return api(original);
             } catch (refreshError) {
-                // Si le refresh échoue, on déconnecte l'utilisateur localement
                 localStorage.removeItem('user');
+                document.cookie = 'access_token=; Max-Age=0; path=/';
+                document.cookie = 'refresh_token=; Max-Age=0; path=/';
 
-                // On redirige vers login UNIQUEMENT si on n'y est pas déjà
-                // pour éviter une boucle de rechargement infinie
                 if (window.location.pathname !== '/login') {
                     window.location.href = '/login';
                 }
@@ -38,5 +37,12 @@ api.interceptors.response.use(
         return Promise.reject(err);
     }
 );
+
+export interface PaginatedResponse<T> {
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: T[];
+}
 
 export default api;

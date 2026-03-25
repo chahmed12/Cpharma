@@ -6,14 +6,19 @@ import type { ReactNode } from 'react';
 
 interface Props {
     children: ReactNode;
-    role?: 'MEDECIN' | 'PHARMACIEN';
+    role?: 'MEDECIN' | 'PHARMACIEN' | 'ADMIN';
 }
+
+const dashboards: Record<string, string> = {
+    MEDECIN: '/doctor/dashboard',
+    PHARMACIEN: '/pharmacist/dashboard',
+    ADMIN: '/admin',
+};
 
 export function ProtectedRoute({ children, role }: Props) {
     const { user, isLoading } = useAuth();
     const location = useLocation();
 
-    // Pendant la lecture du localStorage au démarrage
     if (isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -22,29 +27,20 @@ export function ProtectedRoute({ children, role }: Props) {
         );
     }
 
-    // Pas connecté → login
     if (!user) {
         return <Navigate to="/login" replace />;
     }
 
-    // Utilisateur non vérifié → redirection vers la page d'attente (sauf s'il y est déjà)
     if (!user.is_verified && location.pathname !== '/pending') {
         return <Navigate to="/pending" replace />;
     }
 
-    // Si l'utilisateur EST vérifié mais essaie d'aller sur /pending, on le renvoie vers son dashboard
     if (user.is_verified && location.pathname === '/pending') {
-        return <Navigate to={user.role === 'MEDECIN' ? '/doctor/dashboard' : '/pharmacist/dashboard'} replace />;
+        return <Navigate to={dashboards[user.role] || '/login'} replace />;
     }
 
-    // Mauvais rôle → son propre dashboard
     if (role && user.role !== role) {
-        return (
-            <Navigate
-                to={user.role === 'MEDECIN' ? '/doctor/dashboard' : '/pharmacist/dashboard'}
-                replace
-            />
-        );
+        return <Navigate to={dashboards[user.role] || '/login'} replace />;
     }
 
     return <>{children}</>;

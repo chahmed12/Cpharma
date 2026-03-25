@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './pages/auth/ProtectedRoute';
+import { ConnectionIndicator } from './components/ui/ConnectionIndicator';
 
 // Auth
 import Login from './pages/auth/Login';
@@ -28,6 +29,7 @@ export default function App() {
   const { toasts } = useToast();
   return (
     <BrowserRouter>
+      <ConnectionIndicator />
       <ToastContainer toasts={toasts} />
       <Routes>
 
@@ -35,7 +37,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/pending" element={<RegistrationPending />} />
+        <Route path="/pending" element={<ProtectedRoute><RegistrationPending /></ProtectedRoute>} />
 
         {/* ── Routes pharmacien ────────────────────── */}
         <Route path="/pharmacist/dashboard"

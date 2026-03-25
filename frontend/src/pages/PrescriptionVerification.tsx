@@ -6,12 +6,27 @@ import { Navbar } from '../components/ui/Navbar';
 import { Spinner } from '../components/ui/Spinner';
 import { XCircle, CheckCircle } from 'lucide-react';
 
+interface PrescriptionData {
+    id: number;
+    medecin: { nom: string; prenom: string };
+    patient: { nom: string; prenom: string };
+    ordonnance_data: {
+        consultation_id: number;
+        patient: { nom: string; prenom: string };
+        medicaments: Array<{ nom: string; posologie: string; duree?: string }>;
+        medecin_nom?: string;
+        [key: string]: unknown;
+    };
+    signature: string;
+    medecin_public_key: string;
+    created_at: string;
+}
+
 export default function PrescriptionVerification() {
     const { hash } = useParams<{ hash: string }>();
     const navigate = useNavigate();
     const [status, setStatus] = useState<'loading' | 'valid' | 'invalid'>('loading');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [prescription, setPrescription] = useState<any>(null);
+    const [prescription, setPrescription] = useState<PrescriptionData | null>(null);
     const [confirming, setConfirming] = useState(false);
 
     useEffect(() => {
@@ -142,7 +157,7 @@ export default function PrescriptionVerification() {
                                     <span className="badge badge-paid">Signée</span>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {prescription.ordonnance_data?.medicaments?.map((m: { nom: string; posologie: string; duree: string }, i: number) => (
+                                    {prescription.ordonnance_data?.medicaments?.map((m, i) => (
                                         <div key={i} style={{
                                             padding: '10px 12px',
                                             background: 'var(--bg-subtle)',

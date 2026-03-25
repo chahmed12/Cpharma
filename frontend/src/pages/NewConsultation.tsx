@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createConsultation } from '../services/consultationService';
 import { searchPatients, createPatient, type Patient } from '../services/patientService';
@@ -23,6 +23,30 @@ export default function NewConsultation() {
     const [searchResults, setSearchResults] = useState<Patient[]>([]);
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
     const [isCreatingNew, setIsCreatingNew] = useState(false);
+    const [debouncedQuery, setDebouncedQuery] = useState('');
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Debounce search - déclarations avant utilisation
+    const handleSearch = useCallback((query: string) => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+            setDebouncedQuery(query);
+        }, 300);
+    }, []);
+
+    useEffect(() => {
+        handleSearch(searchQuery);
+    }, [searchQuery, handleSearch]);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        if (debouncedQuery.length > 2) {
+            searchPatients(debouncedQuery).then(setSearchResults).catch(() => {});
+        } else {
+            setSearchResults([]);
+        }
+        return () => controller.abort();
+    }, [debouncedQuery]);
     
     // Formulaire nouveau patient
     const [newPatient, setNewPatient] = useState({
@@ -32,15 +56,6 @@ export default function NewConsultation() {
 
     const [motif, setMotif] = useState('');
     const [loading, setLoading] = useState(false);
-
-    // Recherche temps réel
-    useEffect(() => {
-        if (searchQuery.length > 2) {
-            searchPatients(searchQuery).then(setSearchResults);
-        } else {
-            setSearchResults([]);
-        }
-    }, [searchQuery]);
 
     const handleSubmit = async () => {
         if (!selectedDoctor) return toast("Médecin non sélectionné", "error");

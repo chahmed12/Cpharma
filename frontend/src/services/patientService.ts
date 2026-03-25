@@ -1,4 +1,5 @@
 import api from './api';
+import type { PaginatedResponse } from './api';
 
 export interface MedicalRecord {
     allergies: string;
@@ -6,6 +7,7 @@ export interface MedicalRecord {
     groupe_sanguin: string;
     poids?: number;
     taille?: number;
+    derniere_mise_a_jour?: string;
 }
 
 export interface Patient {
@@ -15,12 +17,13 @@ export interface Patient {
     telephone: string;
     date_naissance: string;
     sexe: 'M' | 'F';
+    adresse?: string;
     medical_record?: MedicalRecord;
 }
 
 export async function searchPatients(query: string): Promise<Patient[]> {
-    const { data } = await api.get<Patient[]>(`/patients/?search=${query}`);
-    return data;
+    const { data } = await api.get<PaginatedResponse<Patient>>('/patients/', { params: { search: query } });
+    return data.results;
 }
 
 export async function createPatient(payload: Partial<Patient>): Promise<Patient> {

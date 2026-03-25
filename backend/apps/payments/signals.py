@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save
-from django.dispatch          import receiver
+from django.dispatch import receiver
 from apps.consultations.models import Consultation
-from .models                   import Payment
+from .models import Payment
 
 
 @receiver(post_save, sender=Consultation)
@@ -17,8 +17,8 @@ def create_payment_on_completion(sender, instance, created, **kwargs):
         return
     if instance.status != Consultation.Status.COMPLETED:
         return
-    if hasattr(instance, 'payment'):
-        return  # Payment déjà créé
+    if Payment.objects.filter(consultation=instance).exists():
+        return
 
     Payment.create_for_consultation(instance)
 

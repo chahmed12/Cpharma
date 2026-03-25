@@ -39,6 +39,7 @@ export default function ConfirmationFin() {
             const updated = await confirmPayment(payment.id);
             setPayment(updated);
             setConfirmed(true);
+            navigate('/pharmacist/dashboard', { replace: true });
 
             // Génère et télécharge le reçu PDF
             const blob = await pdf(<RecuPDF payment={updated} />).toBlob();
@@ -98,10 +99,10 @@ export default function ConfirmationFin() {
                         Montant à collecter auprès du patient
                     </p>
                     <p style={{ fontSize: '42px', fontWeight: '800', color: 'var(--green-800)', lineHeight: '1' }}>
-                        {payment.montant_total} <span style={{ fontSize: '20px' }}>DA</span>
+                        {payment.montant_total} <span style={{ fontSize: '20px' }}>DNT</span>
                     </p>
                     <p style={{ fontSize: '13px', color: 'var(--green-600)', marginTop: '10px' }}>
-                        Dont <strong>{payment.honoraires_medecin} DA</strong> reversés à Dr. {payment.medecin_nom}
+                        Dont <strong>{payment.honoraires_medecin} DNT</strong> reversés à Dr. {payment.medecin_nom}
                     </p>
                 </div>
 

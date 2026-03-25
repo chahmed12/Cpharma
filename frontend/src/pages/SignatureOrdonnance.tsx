@@ -8,25 +8,66 @@ import { pdf } from '@react-pdf/renderer';
 import { OrdonnancePDF } from '../components/prescription/OrdonnancePDF';
 import api from '../services/api';
 import { KeyRound, CheckCircle2, Lock, CheckCircle, AlertOctagon } from 'lucide-react';
+import type { OrdonnanceData } from './PrescriptionForm';
+
+interface SignaturePageState {
+    consultation_id: number;
+    patient: { nom: string; prenom?: string };
+    medicaments: Array<{ id?: string; nom: string; posologie: string; duree?: string }>;
+    instructions?: string;
+    medecin_nom?: string;
+    date?: string;
+    prescription_id?: number;
+}
+
+const PENDING_KEY = 'pendingOrdonnance';
 
 export default function SignatureOrdonnance() {
     const location = useLocation();
     const navigate = useNavigate();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = location.state as any;
     const [status, setStatus] = useState<'idle' | 'loading-key' | 'signing' | 'done' | 'error'>('loading-key');
+    const [data, setData] = useState<SignaturePageState | null>(() => {
+        const sessionData = JSON.parse(sessionStorage.getItem(PENDING_KEY) || 'null');
+        const state = (location.state as SignaturePageState | null) || sessionData;
+        console.log('SignatureOrdonnance - location.state:', location.state);
+        console.log('SignatureOrdonnance - sessionStorage:', sessionData);
+        console.log('SignatureOrdonnance - resolved state:', state);
+        return state || null;
+    });
+    const [dataLoaded, setDataLoaded] = useState(false);
+
+    useEffect(() => {
+        if (!dataLoaded) {
+            const sessionData = JSON.parse(sessionStorage.getItem(PENDING_KEY) || 'null');
+            const state = (location.state as SignaturePageState | null) || sessionData;
+            if (!state) {
+                navigate('/doctor/dashboard');
+                return;
+            }
+            setData(state);
+            sessionStorage.setItem(PENDING_KEY, JSON.stringify(state));
+            setDataLoaded(true);
+        }
+    }, [location.state, navigate, dataLoaded]);
+
+    useEffect(() => {
+        if (status === 'done') {
+            sessionStorage.removeItem(PENDING_KEY);
+        }
+    }, [status]);
+
+    useEffect(() => {
+        if (status === 'done') {
+            sessionStorage.removeItem(PENDING_KEY);
+        }
+    }, [status]);
     const [keyPair, setKeyPair] = useState<CryptoKeyPair | null>(null);
     const [keyError, setKeyError] = useState('');
 
     useEffect(() => {
-        if (!data) {
-            navigate('/doctor/dashboard');
-            return;
-        }
-        // Charger la clé depuis IndexedDB (ou la générer si première fois)
+        if (!data) return;
         loadOrGenerateKeyPair().then(async ({ keyPair: kp, publicKeyB64 }) => {
             setKeyPair(kp);
-            // Toujours uploader ou rafraîchir la clé publique sur le backend (évite désync IndexedDB vs Backend DB)
             try {
                 await api.patch('/doctors/public-key/', { public_key: publicKeyB64 });
             } catch (e) {
@@ -38,7 +79,7 @@ export default function SignatureOrdonnance() {
             setKeyError("Impossible de charger la clé de signature. Réessayez.");
             setStatus('error');
         });
-    }, [data, navigate]);
+    }, [data]);
 
     const handleSign = async () => {
         if (!keyPair || !data) return;
@@ -54,12 +95,13 @@ export default function SignatureOrdonnance() {
             };
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const pdfBlob = await pdf(<OrdonnancePDF data={ordonnanceData as any} />).toBlob();
             const hash = await getSHA256Hash(pdfBlob);
-            const signature = await signData(keyPair.privateKey, ordonnanceData);
+            const signature = await signData(keyPair.privateKey, ordonnanceData as OrdonnanceData);
 
             await submitPrescription({
-                ordonnance: ordonnanceData,
+                ordonnance: ordonnanceData as OrdonnanceData,
                 signature,
                 hash,
                 pdfBlob

@@ -65,16 +65,16 @@ export function RecuPDF({ payment }: { payment: Payment }) {
                 {/* Détail financier */}
                 <View style={S.row}>
                     <Text style={S.label}>Honoraires bruts</Text>
-                    <Text style={S.value}>{payment.montant_total} DA</Text>
+                    <Text style={S.value}>{payment.montant_total} DNT</Text>
                 </View>
                 <View style={S.row}>
                     <Text style={S.label}>Commission plateforme (10%)</Text>
                     {/* Correction ici ↓ */}
-                    <Text style={[S.value, { color: '#ef4444' }]}>- {payment.commission} DA</Text>
+                    <Text style={[S.value, { color: '#ef4444' }]}>- {payment.commission} DNT</Text>
                 </View>
                 <View style={S.rowBold}>
                     <Text style={S.total}>Net médecin</Text>
-                    <Text style={S.total}>{payment.honoraires_medecin} DA</Text>
+                    <Text style={S.total}>{payment.honoraires_medecin} DNT</Text>
                 </View>
 
                 <Text style={S.footer}>

@@ -10,7 +10,7 @@ export interface AuthUser {
     prenom: string;
     role: Role;
     is_verified: boolean;
-    photo_url?: string;
+    photo_url?: string | null;
 }
 
 interface AuthContextType {
@@ -25,34 +25,19 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType>(null!);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<AuthUser | null>(null);
+    const [user, setUser] = useState<AuthUser | null>(() => {
+        try {
+            const stored = localStorage.getItem('user');
+            return stored ? JSON.parse(stored) : null;
+        } catch {
+            return null;
+        }
+    });
     const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        const checkSession = async () => {
-            try {
-                // On vérifie la session avec l'API (qui lira le cookie)
-                const userData = await getMe();
-                setUser(userData);
-            } catch {
-                // Si le refresh échoue, on est silencieux, le useEffect de api.ts s'en chargera
-                logout();
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        checkSession();
-    }, []);
-
-    const login = useCallback(async (email: string, password: string): Promise<AuthUser> => {
-        const data = await loginUser({ email, password });
-        // On ne stocke plus le token ! Juste les infos non-sensibles du profil
-        localStorage.setItem('user', JSON.stringify(data.user));
-        setUser(data.user);
-        return data.user;
-    }, []);
-
+    // FIX : logout défini AVANT le useEffect pour pouvoir l'inclure
+    // dans les dépendances sans risque de re-création infinie
+    // (useCallback avec [] garantit une référence stable)
     const logout = useCallback(async () => {
         try {
             await logoutUser();
@@ -60,20 +45,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.removeItem('user');
             setUser(null);
         }
+    }, []); // référence stable — ne change jamais
+
+    useEffect(() => {
+        let cancelled = false; // évite les setState après démontage
+
+        const checkSession = async () => {
+            try {
+                const userData = await getMe();
+                if (!cancelled) {
+                    const stored = localStorage.getItem('user');
+                    if (stored) {
+                        const storedUser = JSON.parse(stored);
+                        if (storedUser.id !== userData.id || storedUser.role !== userData.role) {
+                            localStorage.removeItem('user');
+                        }
+                    }
+                    setUser(userData);
+                }
+            } catch {
+                if (!cancelled) {
+                    localStorage.removeItem('user');
+                    document.cookie = 'access_token=; Max-Age=0; path=/';
+                    document.cookie = 'refresh_token=; Max-Age=0; path=/';
+                    setUser(null);
+                }
+            } finally {
+                if (!cancelled) setIsLoading(false);
+            }
+        };
+
+        checkSession();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []); // logout retiré des dépendances — le nettoyage est fait directement
+
+    const login = useCallback(async (email: string, password: string): Promise<AuthUser> => {
+        const data = await loginUser({ email, password });
+        localStorage.removeItem('user');
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setUser(data.user);
+        return data.user;
     }, []);
 
     const value = useMemo(() => ({
-        user, isLoading,
+        user,
+        isLoading,
         isAuthenticated: !!user,
-        login, logout
+        login,
+        logout,
     }), [user, isLoading, login, logout]);
 
     return (
         <AuthContext.Provider value={value}>
-            {/* On ne bloque le rendu QUE si on est en train de vérifier la session au tout début */}
             {isLoading ? (
-                <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ width: '30px', height: '30px', border: '3px solid #eee', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin .8s linear infinite' }} />
+                <div style={{
+                    height: '100vh',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}>
+                    <div style={{
+                        width: '30px', height: '30px',
+                        border: '3px solid #eee',
+                        borderTopColor: '#3b82f6',
+                        borderRadius: '50%',
+                        animation: 'spin .8s linear infinite',
+                    }} />
                 </div>
             ) : children}
         </AuthContext.Provider>

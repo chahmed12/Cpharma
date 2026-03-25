@@ -4,6 +4,7 @@ import { registerUser } from '../../services/authService';
 import { Spinner } from '../../components/ui/Spinner';
 import { useToast } from '../../hooks/useToast';
 import { Stethoscope, Pill, ImagePlus } from 'lucide-react';
+import { AxiosError } from 'axios';
 
 type Role = 'MEDECIN' | 'PHARMACIEN';
 
@@ -38,7 +39,8 @@ export default function Register() {
         nom_pharmacie: '',
     });
 
-    const set = (k: string, v: string) =>
+    type FormKeys = keyof typeof form;
+    const set = <K extends FormKeys>(k: K, v: typeof form[K]) =>
         setForm(p => ({ ...p, [k]: v }));
 
     const handleSubmit = async () => {
@@ -58,8 +60,8 @@ export default function Register() {
             await registerUser(fd);
             toast('Compte créé avec succès ! Vous pouvez maintenant vous connecter.', 'success');
             setTimeout(() => { navigate('/login'); }, 1500);
-        } catch (err: unknown) {
-            const error = err as any;
+        } catch (err) {
+            const error = err as AxiosError<Record<string, unknown[] | { detail: string }>>;
             const data = error.response?.data;
             let msg = 'Erreur lors de la création du compte.';
             if (data && typeof data === 'object') {

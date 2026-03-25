@@ -10,9 +10,10 @@ export interface ToastItem {
 
 type ToastListener = (toast: ToastItem) => void;
 const listeners = new Set<ToastListener>();
+let toastIdCounter = 0;
 
 export const triggerToast = (message: string, type: ToastType = 'info') => {
-    const item = { id: Date.now(), message, type };
+    const item = { id: ++toastIdCounter, message, type };
     listeners.forEach(l => l(item));
 };
 

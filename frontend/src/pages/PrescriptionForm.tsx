@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getConsultation } from '../services/consultationService';
+import { getConsultation, type Consultation } from '../services/consultationService';
 import type { Patient } from '../services/patientService';
 import { useAuth } from '../hooks/useAuth';
 import { Navbar } from '../components/ui/Navbar';
 import { Spinner } from '../components/ui/Spinner';
 import { useToast } from '../hooks/useToast';
 import { AlertTriangle, FileText } from 'lucide-react';
+import { getAge } from '../utils/date';
 
 export interface Medicament {
     id: string;
@@ -41,6 +42,7 @@ export default function PrescriptionForm() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const [patient, setPatient] = useState<Patient | null>(null);
+    const [consultation, setConsultation] = useState<Consultation | null>(null);
     const [meds, setMeds] = useState<Medicament[]>([newMed()]);
     const [instructions, setInstructions] = useState('');
     const [loading, setLoading] = useState(true);
@@ -51,8 +53,8 @@ export default function PrescriptionForm() {
         if (id) {
             getConsultation(Number(id), { signal: controller.signal })
                 .then(c => {
-                    // On utilise patient_details qui vient du backend
                     setPatient(c.patient_details);
+                    setConsultation(c);
                 })
                 .catch(err => {
                     if (err.name === 'CanceledError') return;
@@ -78,20 +80,21 @@ export default function PrescriptionForm() {
         }
         if (!patient) return;
 
-        navigate(`/doctor/sign/${id}`, {
-            state: {
-                consultation_id: Number(id),
-                patient: {
-                    nom: patient.nom,
-                    prenom: patient.prenom,
-                    date_naissance: patient.date_naissance,
-                },
-                medicaments: filled,
-                instructions,
-                medecin_nom: `Dr. ${user?.prenom} ${user?.nom}`,
-                date: new Date().toISOString(),
+        const state = {
+            consultation_id: Number(id),
+            patient: {
+                nom: patient.nom,
+                prenom: patient.prenom,
+                date_naissance: patient.date_naissance,
+                motif: consultation?.motif,
             },
-        });
+            medicaments: filled,
+            instructions,
+            medecin_nom: `Dr. ${user?.prenom} ${user?.nom}`,
+            date: new Date().toISOString(),
+        };
+        console.log('Navigating to sign with state:', state);
+        navigate(`/doctor/sign/${id}`, { state });
     };
 
     if (loading) return <Spinner center dark size="lg" label="Chargement..." />;
@@ -114,14 +117,7 @@ export default function PrescriptionForm() {
                             <div>
                                 <p style={{ fontSize: '11px', color: 'var(--blue-600)', fontWeight: '700', textTransform: 'uppercase' }}>Âge</p>
                                 <p style={{ fontWeight: '600', color: 'var(--blue-800)' }}>
-                                {/* Bug B7 fix : calcul d'âge correct (mois/jour inclus) */}
-                                {(() => {
-                                    const b = new Date(patient.date_naissance);
-                                    const n = new Date();
-                                    let age = n.getFullYear() - b.getFullYear();
-                                    if (n < new Date(n.getFullYear(), b.getMonth(), b.getDate())) age--;
-                                    return <>{age} ans</>;
-                                })()}
+                                {getAge(patient.date_naissance)} ans
                                 </p>
                             </div>
                         </div>

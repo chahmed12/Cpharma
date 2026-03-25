@@ -6,30 +6,47 @@ from apps.core.permissions import IsVerified
 from .models import Patient, MedicalRecord
 from .serializers import PatientSerializer, MedicalRecordSerializer
 
+
 class PatientViewSet(viewsets.ModelViewSet):
     serializer_class = PatientSerializer
     permission_classes = [permissions.IsAuthenticated, IsVerified]
 
+    def get_permissions(self):
+        if self.action in ("create", "update", "partial_update", "destroy"):
+            if self.request.user.role != "PHARMACIEN":
+                from rest_framework.exceptions import PermissionDenied
+
+                raise PermissionDenied("Seul un pharmacien peut modifier les patients.")
+            return [permissions.IsAuthenticated(), IsVerified()]
+        return super().get_permissions()
+
     def get_queryset(self):
         user = self.request.user
-        if user.role == 'ADMIN':
-            qs = Patient.objects.all()
-        elif user.role == 'PHARMACIEN':
-            qs = Patient.objects.filter(consultations__pharmacien=user).distinct()
-        elif user.role == 'MEDECIN':
-            qs = Patient.objects.filter(consultations__medecin=user).distinct()
+        if user.role == "ADMIN":
+            qs = Patient.objects.all().select_related("medical_record")
+        elif user.role == "PHARMACIEN":
+            qs = (
+                Patient.objects.filter(consultations__pharmacien=user)
+                .select_related("medical_record")
+                .distinct()
+            )
+        elif user.role == "MEDECIN":
+            qs = (
+                Patient.objects.filter(consultations__medecin=user)
+                .select_related("medical_record")
+                .distinct()
+            )
         else:
             qs = Patient.objects.none()
 
-        query = self.request.query_params.get('search', None)
+        query = self.request.query_params.get("search", None)
         if query:
             qs = qs.filter(
-                models.Q(nom__icontains=query) | 
-                models.Q(telephone__icontains=query)
+                models.Q(nom__icontains=query) | models.Q(telephone__icontains=query)
             )
-        return qs.order_by('-created_at')
+        return qs.order_by("-created_at")
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=["get"])
     def medical_record(self, request, pk=None):
         patient = self.get_object()
         record, created = MedicalRecord.objects.get_or_create(patient=patient)

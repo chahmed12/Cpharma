@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
     netcat-traditional \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Installation des dépendances Python

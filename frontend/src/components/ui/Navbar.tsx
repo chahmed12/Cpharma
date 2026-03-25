@@ -19,7 +19,11 @@ export function Navbar() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const { pathname } = useLocation();
-    const links = NAV_LINKS[user?.role ?? 'MEDECIN'];
+    const links = NAV_LINKS[user?.role as keyof typeof NAV_LINKS] ?? [];
+
+    if (links.length === 0) {
+        return null;
+    }
 
     return (
         <nav style={{

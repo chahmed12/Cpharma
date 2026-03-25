@@ -31,7 +31,7 @@ export function PaymentCard({ payment }: { payment: Payment }) {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <span style={{ fontWeight: '700', fontSize: '16px' }}>
-                    {payment.honoraires_medecin} DA
+                    {payment.honoraires_medecin} DNT
                 </span>
                 <span style={{
                     fontSize: '11px', fontWeight: '700',

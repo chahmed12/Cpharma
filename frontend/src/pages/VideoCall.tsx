@@ -3,7 +3,7 @@ import { useWebRTC } from '../hooks/useWebRTC';
 import { useAuth } from '../hooks/useAuth';
 import { VideoControls } from '../components/video/VideoControls';
 import { ConnectionStatus } from '../components/video/ConnectionStatus';
-import { updateConsultationStatus } from '../services/consultationService';
+import { updateConsultationStatus, getConsultation } from '../services/consultationService';
 
 export default function VideoCall() {
     const { id } = useParams<{ id: string }>();
@@ -23,17 +23,27 @@ export default function VideoCall() {
     const handleHangUp = async () => {
         try {
             hangUp();
-            // Bug B1 fix : seul le médecin clôture la consultation (évite le double COMPLETED)
             if (!isCaller) {
                 await updateConsultationStatus(consultationId, 'COMPLETED');
             }
         } catch (e) {
             console.error("Erreur lors de la clôture:", e);
         } finally {
-            const dest = isCaller
-                ? `/pharmacist/waiting-prescription/${consultationId}`
-                : `/doctor/prescription/${consultationId}`;
-            navigate(dest);
+            if (isCaller) {
+                navigate(`/pharmacist/waiting-prescription/${consultationId}`);
+            } else {
+                try {
+                    const c = await getConsultation(consultationId);
+                    if (c.status === 'CANCELLED') {
+                        navigate('/doctor/dashboard');
+                        return;
+                    }
+                } catch {
+                    navigate('/doctor/dashboard');
+                    return;
+                }
+                navigate(`/doctor/prescription/${consultationId}`);
+            }
         }
     };
 

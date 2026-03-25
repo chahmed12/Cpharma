@@ -12,6 +12,7 @@ import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
 import { Navbar } from '../components/ui/Navbar';
 import { CheckCircle, User } from 'lucide-react';
+import { getAge } from '../utils/date';
 
 export default function DoctorDashboard() {
     const { user } = useAuth();
@@ -26,13 +27,15 @@ export default function DoctorDashboard() {
     useEffect(() => {
         const controller = new AbortController();
         const opts = { signal: controller.signal };
-        Promise.all([getQueue(opts), getDoctorStatus(opts), getHistory(opts), getDoctorRevenues(opts)])
+        Promise.all([
+            getQueue(opts), 
+            getDoctorStatus(opts), 
+            getHistory({ ...opts, params: { status: 'COMPLETED,CANCELLED' } }), 
+            getDoctorRevenues(opts)
+        ])
             .then(([q, s, h, r]) => {
                 setQueue(q);
-                // Bug #11 : n'afficher que les consultations terminées / annulées
-                setHistory(h.results.filter((c: Consultation) =>
-                    c.status === 'COMPLETED' || c.status === 'CANCELLED'
-                ));
+                setHistory(h.results);
                 setRevenues(r);
                 if (s === 'ONLINE' || s === 'OFFLINE') setMyStatus(s);
                 else if (s === 'BUSY') setMyStatus('OFFLINE');
@@ -47,7 +50,10 @@ export default function DoctorDashboard() {
     }, []);
 
     useSocket('new_patient', (data) => {
-        setQueue(prev => [data as Consultation, ...prev]);
+        const c = data as Consultation;
+        if (c?.id && c?.patient_details) {
+            setQueue(prev => [c, ...prev]);
+        }
     });
 
     const toggleStatus = async () => {
@@ -68,16 +74,6 @@ export default function DoctorDashboard() {
     };
 
     const isOnline = myStatus === 'ONLINE';
-
-    const getAge = (dateNaissance: string) => {
-        const b = new Date(dateNaissance);
-        const n = new Date();
-        let age = n.getFullYear() - b.getFullYear();
-        if (n.getMonth() < b.getMonth() || (n.getMonth() === b.getMonth() && n.getDate() < b.getDate())) {
-            age--;
-        }
-        return age;
-    };
 
     return (
         <div className="page-wrapper">
@@ -230,7 +226,7 @@ export default function DoctorDashboard() {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                             <div className="card" style={{ padding: '20px', textAlign: 'center' }}>
                                 <p style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Total net encaissé</p>
-                                <p style={{ fontSize: '28px', fontWeight: '800', color: 'var(--green-700)', lineHeight: '1' }}>{revenues.total_net} <span style={{ fontSize: '14px' }}>DA</span></p>
+                                <p style={{ fontSize: '28px', fontWeight: '800', color: 'var(--green-700)', lineHeight: '1' }}>{revenues.total_net} <span style={{ fontSize: '14px' }}>DNT</span></p>
                             </div>
                             <div className="card" style={{ padding: '20px', textAlign: 'center' }}>
                                 <p style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Consultations payées</p>

@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef } from 'react';
 import { SocketContext } from '../context/SocketContext';
 
 /**
- * S'abonne à un événement WebSocket pendant la durée de vie du composant.
+ * Hook pour s'abonner à un événement WebSocket.
  * Usage : useSocket('new_patient', (data) => setQueue(prev => [...prev, data]));
  */
 export function useSocket(
@@ -11,7 +11,6 @@ export function useSocket(
 ) {
     const { on, off, send, isConnected } = useContext(SocketContext);
 
-    // Garde toujours la dernière version du handler sans re-subscribe
     const handlerRef = useRef(handler);
     useEffect(() => {
         handlerRef.current = handler;
@@ -24,4 +23,13 @@ export function useSocket(
     }, [event, on, off]);
 
     return { send, isConnected };
+}
+
+/**
+ * Hook pour accéder uniquement à l'état de connexion WebSocket.
+ * Usage : const { isConnected } = useSocketConnection();
+ */
+export function useSocketConnection() {
+    const { isConnected } = useContext(SocketContext);
+    return { isConnected };
 }
