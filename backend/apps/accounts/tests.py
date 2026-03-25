@@ -18,6 +18,11 @@ from rest_framework.throttling import AnonRateThrottle
 
 AnonRateThrottle.rate = None
 
+# Disable secure cookies in tests (HTTP, not HTTPS)
+from django.conf import settings
+
+settings.AUTH_COOKIE_SECURE = False
+
 User = get_user_model()
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
