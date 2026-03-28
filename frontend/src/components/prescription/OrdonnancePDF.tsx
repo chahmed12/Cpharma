@@ -1,5 +1,5 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
-import type { OrdonnanceData } from '../../pages/PrescriptionForm';
+import type { OrdonnanceData } from '../../types/prescription';
 
 const S = StyleSheet.create({
     page: { padding: 40, fontFamily: 'Helvetica', fontSize: 11 },

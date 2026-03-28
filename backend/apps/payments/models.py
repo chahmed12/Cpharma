@@ -3,8 +3,8 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 
-# Bug PAY-2 fix : Taux de commission et tarif configurables via settings (env)
-COMMISSION_RATE = getattr(settings, "CPHARMA_COMMISSION_RATE", Decimal("0.10"))
+# Taux de commission (15%) et tarif par défaut configurables via settings (env)
+COMMISSION_RATE = getattr(settings, "CPHARMA_COMMISSION_RATE", Decimal("0.15"))
 TARIF_DEFAUT = getattr(settings, "CPHARMA_TARIF_DEFAUT", Decimal("50.00"))
 
 
@@ -31,6 +31,12 @@ class Payment(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["medecin", "status"]),
+            models.Index(fields=["status", "created_at"]),
+        ]
 
     @classmethod
     def create_for_consultation(cls, consultation):

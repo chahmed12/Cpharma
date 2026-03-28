@@ -6,7 +6,8 @@ import { getHistory, type Consultation }
     from '../services/consultationService';
 import { useSocket } from '../hooks/useSocket';
 import { Navbar } from '../components/ui/Navbar';
-import { Stethoscope } from 'lucide-react';
+import { Stethoscope, Download, FileText, DollarSign } from 'lucide-react';
+import { getPharmacistPayments, downloadPaymentsCsv, downloadInvoice, type Payment } from '../services/paymentService';
 
 // ── Composant skeleton card ────────────────────────
 function SkeletonCard() {
@@ -141,10 +142,12 @@ export default function PharmacistDashboard() {
     const navigate = useNavigate();
     const [doctors, setDoctors] = useState<Doctor[]>([]);
     const [history, setHistory] = useState<Consultation[]>([]);
+    const [payments, setPayments] = useState<Payment[]>([]);
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [showFinances, setShowFinances] = useState(false);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -166,6 +169,14 @@ export default function PharmacistDashboard() {
         
         return () => controller.abort();
     }, []);
+
+    useEffect(() => {
+        if (showFinances && payments.length === 0) {
+            getPharmacistPayments()
+                .then(setPayments)
+                .catch(console.error);
+        }
+    }, [showFinances]);
 
     const loadMoreDoctors = async () => {
         if (!hasMore || loadingMore) return;
@@ -304,6 +315,72 @@ export default function PharmacistDashboard() {
                             </div>
                         ))}
                     </div>
+                </section>
+
+                {/* Section finances */}
+                <section style={{ marginBottom: '48px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                        <p className="section-title" style={{ margin: 0 }}>Finances</p>
+                        <button
+                            onClick={() => setShowFinances(!showFinances)}
+                            className="btn btn-sm"
+                            style={{ padding: '6px 12px', fontSize: '12px' }}
+                        >
+                            {showFinances ? 'Masquer' : 'Afficher'}
+                        </button>
+                    </div>
+
+                    {showFinances && (
+                        <div className="animate-fade-up">
+                            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                                <button
+                                    onClick={downloadPaymentsCsv}
+                                    className="btn btn-secondary"
+                                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                                >
+                                    <Download size={16} />
+                                    Exporter CSV
+                                </button>
+                            </div>
+
+                            {payments.length === 0 ? (
+                                <div className="card-flat" style={{ padding: '32px', textAlign: 'center' }}>
+                                    <DollarSign size={40} className="text-gray-400 mx-auto" style={{ marginBottom: '8px' }} />
+                                    <p style={{ color: 'var(--text-muted)' }}>Aucune transaction pour le moment</p>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {payments.slice(0, 10).map(p => (
+                                        <div key={p.id} className="card" style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div>
+                                                <p style={{ fontWeight: '600', fontSize: '14px', marginBottom: '2px' }}>
+                                                    Dr. {p.medecin_nom}
+                                                </p>
+                                                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                                    {new Date(p.created_at).toLocaleDateString('fr-FR')} - {p.patient_nom}
+                                                </p>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <p style={{ fontWeight: '700', fontSize: '15px', color: 'var(--green-700)' }}>
+                                                    {p.montant_total} DNT
+                                                </p>
+                                                <button
+                                                    onClick={() => downloadInvoice(p.id)}
+                                                    style={{
+                                                        background: 'none', border: 'none', cursor: 'pointer',
+                                                        color: 'var(--blue-600)', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px',
+                                                    }}
+                                                >
+                                                    <FileText size={12} />
+                                                    Facture
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </section>
 
             </div>

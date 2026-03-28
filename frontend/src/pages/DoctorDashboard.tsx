@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
     getQueue,
     getHistory,
@@ -11,43 +11,76 @@ import { getDoctorRevenues, type RevenusData } from '../services/paymentService'
 import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
 import { Navbar } from '../components/ui/Navbar';
-import { CheckCircle, User } from 'lucide-react';
-import { getAge } from '../utils/date';
+import { CheckCircle, User, Settings, TrendingUp } from 'lucide-react';
+import { getAge, formatCurrency } from '../utils/date';
+import { useToast } from '../hooks/useToast';
 
 export default function DoctorDashboard() {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const toast = useToast().toast;
     const [queue, setQueue] = useState<Consultation[]>([]);
     const [history, setHistory] = useState<Consultation[]>([]);
     const [revenues, setRevenues] = useState<RevenusData | null>(null);
     const [loading, setLoading] = useState(true);
     const [myStatus, setMyStatus] = useState<'ONLINE' | 'OFFLINE' | 'BUSY'>('OFFLINE');
     const [toggling, setToggling] = useState(false);
+    const [actionLoading, setActionLoading] = useState<number | null>(null);
+    const [showRevenus, setShowRevenus] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
 
+    // Load essential data first (queue + status)
     useEffect(() => {
         const controller = new AbortController();
-        const opts = { signal: controller.signal };
         Promise.all([
-            getQueue(opts), 
-            getDoctorStatus(opts), 
-            getHistory({ ...opts, params: { status: 'COMPLETED,CANCELLED' } }), 
-            getDoctorRevenues(opts)
+            getQueue({ signal: controller.signal }),
+            getDoctorStatus({ signal: controller.signal }),
         ])
-            .then(([q, s, h, r]) => {
+            .then(([q, s]) => {
                 setQueue(q);
-                setHistory(h.results);
-                setRevenues(r);
                 if (s === 'ONLINE' || s === 'OFFLINE') setMyStatus(s);
                 else if (s === 'BUSY') setMyStatus('OFFLINE');
             })
             .catch(err => {
                 if (err.name === 'CanceledError') return;
                 console.error(err);
+                toast('Erreur lors du chargement.', 'error');
             })
             .finally(() => setLoading(false));
-            
+
         return () => controller.abort();
-    }, []);
+    }, [toast]);
+
+    // Load secondary data lazily when needed
+    useEffect(() => {
+        const controller = new AbortController();
+        
+        const promises: Promise<unknown>[] = [];
+        if (showRevenus && !revenues) {
+            promises.push(getDoctorRevenues({ signal: controller.signal }));
+        } else {
+            promises.push(Promise.resolve(null));
+        }
+        
+        if (showHistory && history.length === 0) {
+            promises.push(
+                getHistory({ signal: controller.signal, params: { status: 'COMPLETED,CANCELLED' } })
+            );
+        } else {
+            promises.push(Promise.resolve(null));
+        }
+
+        Promise.all(promises)
+            .then(([r, h]) => {
+                if (r) setRevenues(r as RevenusData);
+                if (h) setHistory((h as { results: Consultation[] }).results);
+            })
+            .catch(err => {
+                if (err.name !== 'CanceledError') console.error(err);
+            });
+
+        return () => controller.abort();
+    }, [showRevenus, showHistory, revenues, history.length]);
 
     useSocket('new_patient', (data) => {
         const c = data as Consultation;
@@ -68,9 +101,28 @@ export default function DoctorDashboard() {
     };
 
     const acceptConsultation = async (id: number) => {
-        await updateConsultationStatus(id, 'ACTIVE');
-        setQueue(prev => prev.filter(c => c.id !== id));
-        navigate(`/doctor/video/${id}`);
+        setActionLoading(id);
+        try {
+            await updateConsultationStatus(id, 'ACTIVE');
+            setQueue(prev => prev.filter(c => c.id !== id));
+            toast('Consultation acceptée !', 'success');
+            navigate(`/doctor/video/${id}`);
+        } catch {
+            toast('Erreur lors de l\'acceptation de la consultation.', 'error');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const refuseConsultation = async (id: number) => {
+        toast('Consultation refusée.', 'info');
+        try {
+            await updateConsultationStatus(id, 'CANCELLED');
+            setQueue(prev => prev.filter(c => c.id !== id));
+            toast('Consultation refusée.', 'success');
+        } catch {
+            toast('Erreur lors du refus de la consultation.', 'error');
+        }
     };
 
     const isOnline = myStatus === 'ONLINE';
@@ -113,6 +165,21 @@ export default function DoctorDashboard() {
                             </p>
                         </div>
                     </div>
+
+                    <Link
+                        to="/doctor/profile"
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            padding: '10px 16px', borderRadius: '8px',
+                            border: '1.5px solid var(--border)',
+                            background: 'var(--bg-card)', color: 'var(--text-secondary)',
+                            textDecoration: 'none', fontSize: '14px',
+                            transition: 'border-color .2s',
+                        }}
+                    >
+                        <Settings size={16} />
+                        Modifier mon profil
+                    </Link>
 
                     <button
                         onClick={toggleStatus}
@@ -210,40 +277,88 @@ export default function DoctorDashboard() {
                                             {c.motif}
                                         </p>
                                     </div>
-                                    <button className="btn btn-primary" onClick={() => acceptConsultation(c.id)} style={{ flexShrink: 0 }}>
-                                        Accepter →
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                        <button 
+                                            className="btn btn-danger" 
+                                            onClick={() => refuseConsultation(c.id)}
+                                            style={{ padding: '8px 16px', fontSize: '13px' }}
+                                            disabled={actionLoading !== null}
+                                        >
+                                            Refuser
+                                        </button>
+                                        <button 
+                                            className="btn btn-primary" 
+                                            onClick={() => acceptConsultation(c.id)}
+                                            disabled={actionLoading !== null}
+                                        >
+                                            {actionLoading === c.id ? '...' : 'Accepter →'}
+                                        </button>
+                                    </div>
                                 </div>
                             ))
                         )}
                     </div>
                 </section>
 
-                {/* Revenus — Bug #10 */}
-                {revenues && (
-                    <section style={{ marginBottom: '32px' }}>
-                        <p className="section-title">Mes revenus</p>
+                {/* Revenus — lazy loaded */}
+                <section style={{ marginBottom: '32px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                        <p className="section-title" style={{ margin: 0 }}>Mes revenus</p>
+                        <Link
+                            to="/doctor/finances"
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '6px',
+                                padding: '6px 12px', borderRadius: '6px',
+                                background: 'var(--bg-subtle)', color: 'var(--blue-600)',
+                                textDecoration: 'none', fontSize: '13px', fontWeight: '600',
+                            }}
+                        >
+                            <TrendingUp size={14} />
+                            Détails
+                        </Link>
+                    </div>
+                    {!showRevenus ? (
+                        <button 
+                            className="btn btn-secondary"
+                            onClick={() => setShowRevenus(true)}
+                        >
+                            Charger mes revenus
+                        </button>
+                    ) : !revenues ? (
+                        <p style={{ color: 'var(--text-muted)' }}>Chargement...</p>
+                    ) : (
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                             <div className="card" style={{ padding: '20px', textAlign: 'center' }}>
                                 <p style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Total net encaissé</p>
-                                <p style={{ fontSize: '28px', fontWeight: '800', color: 'var(--green-700)', lineHeight: '1' }}>{revenues.total_net} <span style={{ fontSize: '14px' }}>DNT</span></p>
+                                <p style={{ fontSize: '28px', fontWeight: '800', color: 'var(--green-700)', lineHeight: '1' }}>{formatCurrency(revenues.total_net)} <span style={{ fontSize: '14px' }}>DNT</span></p>
                             </div>
                             <div className="card" style={{ padding: '20px', textAlign: 'center' }}>
                                 <p style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Consultations payées</p>
                                 <p style={{ fontSize: '28px', fontWeight: '800', color: 'var(--blue-600)', lineHeight: '1' }}>{revenues.nb_consultations}</p>
                             </div>
                         </div>
-                    </section>
-                )}
+                    )}
+                </section>
 
-                {/* Historique — Bug #11 (filtré à COMPLETED/CANCELLED) */}
+                {/* Historique — lazy loaded */}
                 <section>
                     <p className="section-title">Consultations récentes</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {!loading && history.length === 0 && (
-                            <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Aucune consultation terminée pour le moment.</p>
-                        )}
-                        {history.slice(0, 5).map(c => (
+                    {!showHistory ? (
+                        <button 
+                            className="btn btn-secondary"
+                            onClick={() => setShowHistory(true)}
+                        >
+                            Charger l'historique
+                        </button>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {!revenues && history.length === 0 && (
+                                <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Chargement...</p>
+                            )}
+                            {history.length === 0 && revenues && (
+                                <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Aucune consultation terminée.</p>
+                            )}
+                            {history.slice(0, 5).map(c => (
                             <div key={c.id} className="card" style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
                                     <p style={{ fontWeight: '600', fontSize: '14px', marginBottom: '2px' }}>
@@ -267,6 +382,7 @@ export default function DoctorDashboard() {
                             </div>
                         ))}
                     </div>
+                    )}
                 </section>
 
             </div>

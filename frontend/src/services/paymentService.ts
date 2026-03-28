@@ -51,3 +51,31 @@ export async function getDoctorRevenues(options?: { signal?: AbortSignal }): Pro
 }
 
 // Note: le téléchargement du reçu est géré côté client via @react-pdf/renderer dans ConfirmationFin.tsx
+
+// Pharmacien consulte son historique de paiements
+export async function getPharmacistPayments(options?: { signal?: AbortSignal }): Promise<Payment[]> {
+    const { data } = await api.get<{ results: Payment[] }>('/payments/', options);
+    return data.results;
+}
+
+// Exporte les paiements en CSV
+export function downloadPaymentsCsv() {
+    const link = document.createElement('a');
+    link.href = '/api/payments/export-csv/';
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Télécharge la facture PDF d'un paiement
+export function downloadInvoice(paymentId: number) {
+    const link = document.createElement('a');
+    link.href = `/api/payments/${paymentId}/invoice/`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}

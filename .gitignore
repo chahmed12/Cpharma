@@ -1,3 +1,6 @@
 venv/\n__pycache__/\n*.pyc\n.env\ndb.sqlite3\nmedia/\nstaticfiles/
 audit.log
 *.log
+chapitre3_aide_redaction.md
+bugs_audit_report.md
+PROJECT_CONTEXT.md

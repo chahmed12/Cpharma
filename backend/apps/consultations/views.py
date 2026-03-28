@@ -31,14 +31,32 @@ class ConsultationViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         from rest_framework.exceptions import PermissionDenied, ValidationError
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
 
         if self.request.user.role != "PHARMACIEN":
             raise PermissionDenied("Seul un pharmacien peut créer une consultation.")
 
         patient_id = self.request.data.get("patient_id")
-        # Bug A1 fix: patient_id obligatoire pour éviter consultation.patient==None
         if not patient_id:
             raise ValidationError({"patient_id": "Ce champ est obligatoire."})
+
+        medecin_id = self.request.data.get("medecin")
+        if medecin_id:
+            try:
+                medecin = User.objects.select_related("doctorprofile").get(
+                    id=medecin_id, role="MEDECIN"
+                )
+                if not hasattr(medecin, "doctorprofile"):
+                    raise ValidationError({"medecin": "Profil médecin introuvable."})
+                if medecin.doctorprofile.status != "ONLINE":
+                    raise ValidationError(
+                        {"medecin": "Ce médecin n'est pas disponible actuellement."}
+                    )
+            except User.DoesNotExist:
+                raise ValidationError({"medecin": "Médecin introuvable."})
+
         consultation = serializer.save(
             pharmacien=self.request.user, patient_id=patient_id
         )
@@ -105,7 +123,9 @@ class ConsultationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], url_path="queue")
     def queue(self, request):
         """Endpoint explicite pour la file d'attente du médecin."""
-        qs = Consultation.objects.filter(
-            medecin=request.user, status="PENDING"
-        ).order_by("created_at")
+        qs = (
+            Consultation.objects.filter(medecin=request.user, status="PENDING")
+            .select_related("patient", "patient__medical_record", "pharmacien")
+            .order_by("created_at")
+        )
         return Response(ConsultationSerializer(qs, many=True).data)

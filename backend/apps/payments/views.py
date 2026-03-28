@@ -1,5 +1,9 @@
+import csv
+import io
+from datetime import datetime
 from django.db.models import Sum
 from django.utils import timezone
+from django.http import HttpResponse
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -53,6 +57,8 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["patch"], url_path="confirm")
     def confirm(self, request, pk=None):
         """Pharmacien confirme la réception du paiement en espèces."""
+        from django.db import transaction
+
         if request.user.role != "PHARMACIEN":
             return Response(
                 {"detail": "Seul le pharmacien peut confirmer un paiement."},
@@ -74,19 +80,20 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        payment.status = Payment.Status.PAID
-        payment.paid_at = timezone.now()
-        payment.save()
+        with transaction.atomic():
+            payment.status = Payment.Status.PAID
+            payment.paid_at = timezone.now()
+            payment.save()
 
-        # Bug ORD-4 fix : Marquer l'ordonnance comme définitivement délivrée
-        if hasattr(payment.consultation, "prescription"):
-            payment.consultation.prescription.is_dispensed = True
-            payment.consultation.prescription.save()
+            if hasattr(payment.consultation, "prescription"):
+                payment.consultation.prescription.is_dispensed = True
+                payment.consultation.prescription.save()
 
         log_action(
             request.user,
             "PAYMENT_CONFIRMED",
             f"Paiement #{payment.id} confirmé pour consultation #{payment.consultation_id}",
+            request=request,
         )
 
         return Response(PaymentSerializer(payment).data)
@@ -114,3 +121,85 @@ class PaymentViewSet(viewsets.ReadOnlyModelViewSet):
                 "paiements": PaymentSerializer(qs, many=True).data,
             }
         )
+
+    @action(detail=False, methods=["get"], url_path="export-csv")
+    def export_csv(self, request):
+        """Exporte les paiements en CSV pour la comptabilité."""
+        user = request.user
+        if user.role == "MEDECIN":
+            qs = Payment.objects.filter(medecin=user, status=Payment.Status.PAID)
+        elif user.role == "PHARMACIEN":
+            qs = Payment.objects.filter(
+                consultation__pharmacien=user, status=Payment.Status.PAID
+            )
+        else:
+            return Response(
+                {"detail": "Non autorisé"}, status=status.HTTP_403_FORBIDDEN
+            )
+
+        qs = qs.select_related("medecin", "consultation__patient").order_by(
+            "-created_at"
+        )
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(
+            [
+                "ID",
+                "Date",
+                "Médecin",
+                "Patient",
+                "Montant Total",
+                "Commission",
+                "Honoraires Médecin",
+                "Statut",
+            ]
+        )
+        for p in qs:
+            patient = getattr(p.consultation, "patient", None)
+            writer.writerow(
+                [
+                    p.id,
+                    p.created_at.strftime("%d/%m/%Y %H:%M"),
+                    f"{p.medecin.prenom} {p.medecin.nom}",
+                    f"{patient.prenom} {patient.nom}" if patient else "",
+                    str(p.montant_total),
+                    str(p.commission),
+                    str(p.honoraires_medecin),
+                    p.status,
+                ]
+            )
+
+        response = HttpResponse(output.getvalue(), content_type="text/csv")
+        filename = f"cpharma_paiements_{datetime.now().strftime('%Y%m%d')}.csv"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+    @action(detail=True, methods=["get"], url_path="invoice")
+    def invoice(self, request, pk=None):
+        """Génère un PDF facture pour un paiement."""
+        from django.shortcuts import render
+
+        payment = self.get_object()
+        serializer = PaymentSerializer(payment)
+
+        consultation_date = serializer.data.get("consultation_date", payment.created_at)
+        if isinstance(consultation_date, str):
+            dt = datetime.fromisoformat(consultation_date.replace("Z", "+00:00"))
+            consultation_date = dt.strftime("%d/%m/%Y à %H:%M")
+        else:
+            consultation_date = payment.created_at.strftime("%d/%m/%Y à %H:%M")
+
+        context = {
+            "payment": payment,
+            "consultation_date": consultation_date,
+            "patient_nom": serializer.data.get("patient_nom", ""),
+            "medecin_nom": serializer.data.get("medecin_nom", ""),
+            "medecin_email": serializer.data.get("medecin_email", ""),
+            "medecin_specialite": serializer.data.get("medecin_specialite", "Médecin"),
+            "montant_total": serializer.data.get("montant_total", "0.00"),
+            "commission": serializer.data.get("commission", "0.00"),
+            "honoraires_medecin": serializer.data.get("honoraires_medecin", "0.00"),
+            "generation_date": datetime.now().strftime("%d/%m/%Y à %H:%M"),
+        }
+        return render(request, "payments/invoice.html", context)

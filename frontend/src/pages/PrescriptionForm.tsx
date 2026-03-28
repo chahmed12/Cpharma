@@ -8,27 +8,7 @@ import { Spinner } from '../components/ui/Spinner';
 import { useToast } from '../hooks/useToast';
 import { AlertTriangle, FileText } from 'lucide-react';
 import { getAge } from '../utils/date';
-
-export interface Medicament {
-    id: string;
-    nom: string;
-    posologie: string;
-    duree: string;
-}
-
-export interface OrdonnanceData {
-    consultation_id: number;
-    patient: {
-        nom: string;
-        prenom?: string;
-        date_naissance?: string;
-        motif?: string;
-    };
-    medicaments: Medicament[];
-    instructions: string;
-    medecin_nom: string;
-    date: string;
-}
+import type { Medicament } from '../types/prescription';
 
 const newMed = (): Medicament => ({
     id: crypto.randomUUID(),
@@ -78,7 +58,15 @@ export default function PrescriptionForm() {
             toast('Ajoutez au moins un médicament.', 'error');
             return;
         }
-        if (!patient) return;
+        const missingPosologie = filled.some(m => !m.posologie.trim());
+        if (missingPosologie) {
+            toast('Veuillez remplir la posologie pour tous les médicaments.', 'error');
+            return;
+        }
+        if (!patient) {
+            toast('Données patient manquantes.', 'error');
+            return;
+        }
 
         const state = {
             consultation_id: Number(id),
@@ -93,7 +81,6 @@ export default function PrescriptionForm() {
             medecin_nom: `Dr. ${user?.prenom} ${user?.nom}`,
             date: new Date().toISOString(),
         };
-        console.log('Navigating to sign with state:', state);
         navigate(`/doctor/sign/${id}`, { state });
     };
 

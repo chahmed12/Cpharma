@@ -1,4 +1,4 @@
-import { Mic, MicOff, Video, VideoOff, PhoneOff } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, MessageCircle } from 'lucide-react';
 
 interface VideoControlsProps {
     isMicOn: boolean;
@@ -6,6 +6,8 @@ interface VideoControlsProps {
     onToggleMic: () => void;
     onToggleCam: () => void;
     onHangUp: () => void;
+    onToggleChat?: () => void;
+    showChat?: boolean;
 }
 
 const btnBase: React.CSSProperties = {
@@ -18,7 +20,7 @@ const btnBase: React.CSSProperties = {
 };
 
 export function VideoControls({
-    isMicOn, isCamOn, onToggleMic, onToggleCam, onHangUp
+    isMicOn, isCamOn, onToggleMic, onToggleCam, onHangUp, onToggleChat, showChat
 }: VideoControlsProps) {
     return (
         <div style={{
@@ -50,6 +52,20 @@ export function VideoControls({
             >
                 {isCamOn ? <Video size={24} color="white" /> : <VideoOff size={24} color="white" />}
             </button>
+
+            {/* Chat */}
+            {onToggleChat && (
+                <button
+                    onClick={onToggleChat}
+                    title="Messages"
+                    style={{
+                        ...btnBase,
+                        background: showChat ? '#2563eb' : '#374151',
+                    }}
+                >
+                    <MessageCircle size={24} color="white" />
+                </button>
+            )}
 
             {/* Raccrocher */}
             <button

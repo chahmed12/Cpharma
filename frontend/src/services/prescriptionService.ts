@@ -1,5 +1,5 @@
 import api from './api';
-import type { OrdonnanceData } from '../pages/PrescriptionForm';
+import type { OrdonnanceData } from '../types/prescription';
 
 interface SubmitPayload {
     ordonnance: OrdonnanceData;
@@ -8,7 +8,6 @@ interface SubmitPayload {
     pdfBlob: Blob;
 }
 
-// Médecin soumet l'ordonnance signée
 export async function submitPrescription({
     ordonnance, signature, hash, pdfBlob
 }: SubmitPayload) {
@@ -24,7 +23,6 @@ export async function submitPrescription({
     return data;
 }
 
-// Pharmacien vérifie une ordonnance via son hash
 export async function verifyPrescription(hash: string) {
     const { data } = await api.get(`/prescriptions/verify/${hash}/`);
     return data;

@@ -42,19 +42,26 @@ class JwtAuthMiddleware:
             if settings.AUTH_COOKIE in cookie:
                 token = cookie[settings.AUTH_COOKIE].value
 
-        # 2. Fallback sur la query string UNIQUEMENT en DEBUG
+        import logging
+        logger = logging.getLogger(__name__)
+
         if not token and settings.DEBUG:
             query_string = scope.get("query_string", b"").decode()
             query_params = parse_qs(query_string)
             token = query_params.get("token", [None])[0]
             if token:
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.warning("WS auth via query string — dev only!")
 
+        logger.info(f"WS DEBUG: cookie_header='{cookie_header}'")
+        logger.info(f"WS DEBUG: token='{token}'")
+
         if token:
-            scope["user"] = await get_user_from_token(token)
+            try:
+                scope["user"] = await get_user_from_token(token)
+                logger.info(f"WS DEBUG: user='{scope['user']}'")
+            except Exception as e:
+                logger.error(f"WS DEBUG Error: {e}")
+                scope["user"] = AnonymousUser()
         else:
             scope["user"] = AnonymousUser()
 

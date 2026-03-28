@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     # Local apps
+    "apps.core",
     "apps.accounts",
     "apps.patients",
     "apps.consultations",
@@ -63,7 +64,7 @@ ASGI_APPLICATION = "config.asgi.application"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -218,3 +219,19 @@ LOGGING = {
         },
     },
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  EMAIL — Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# En développement, le code OTP s'affiche dans les logs Docker (docker compose logs backend).
+# En production, définir EMAIL_HOST, EMAIL_PORT, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, etc.
+if DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+    EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+    DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@cpharma.tn")

@@ -8,7 +8,6 @@ const NAV_LINKS = {
     ],
     PHARMACIEN: [
         { href: '/pharmacist/dashboard', label: 'Tableau de bord' },
-        { href: '/pharmacist/new-consultation', label: 'Nouvelle consultation' },
     ],
     ADMIN: [
         { href: '/admin', label: 'Dashboard Admin' },

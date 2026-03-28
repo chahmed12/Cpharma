@@ -1,10 +1,20 @@
-import logging
+"""
+apps/core/audit.py
+==================
+Journalisation d'audit pour les actions sensibles.
+"""
 
-logger = logging.getLogger('audit')
+from .models import AuditLog
 
-def log_action(user, action, details=""):
+
+def log_action(user, action, details="", request=None):
     """
-    Log une action critique avec l'utilisateur et les détails.
+    Enregistre une action dans la piste d'audit.
+
+    Args:
+        user: CustomUser ou None
+        action: Code de l'action
+        details: Description détaillée
+        request: Request Django optionnel (pour IP et user agent)
     """
-    user_str = f"{user.email} (ID:{user.id})" if user and not user.is_anonymous else "Anonyme"
-    logger.info(f"AUDIT | User: {user_str} | Action: {action} | Details: {details}")
+    AuditLog.log_action(user, action, details, request)

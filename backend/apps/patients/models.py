@@ -9,7 +9,7 @@ class Patient(models.Model):
 
     nom = models.CharField(max_length=100)
     prenom = models.CharField(max_length=100)
-    telephone = models.CharField(max_length=20, unique=True)
+    telephone = models.CharField(max_length=20, unique=True, db_index=True)
     date_naissance = models.DateField()
     sexe = models.CharField(max_length=1, choices=Sexe.choices, default=Sexe.MASCULIN)
     adresse = models.TextField(blank=True)

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #2563eb; padding-bottom: 20px; }
+        .header h1 { color: #2563eb; margin: 0; }
+        .header h2 { color: #666; font-weight: normal; margin: 5px 0 0; font-size: 14px; }
+        .info { display: flex; justify-content: space-between; margin: 20px 0; }
+        .info-box { background: #f8fafc; padding: 15px; border-radius: 8px; flex: 1; margin: 0 10px; }
+        .info-box:first-child { margin-left: 0; }
+        .info-box:last-child { margin-right: 0; }
+        .info-box h3 { font-size: 12px; color: #666; margin: 0 0 5px; text-transform: uppercase; }
+        .info-box p { margin: 3px 0; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th { background: #2563eb; color: white; padding: 12px; text-align: left; }
+        td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+        .total-row { background: #f1f5f9; font-weight: bold; }
+        .footer { margin-top: 40px; text-align: center; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>CPharma</h1>
+        <h2>Facture de Téléconsultation</h2>
+    </div>
+
+    <div class="info">
+        <div class="info-box">
+            <h3>Informations Consultation</h3>
+            <p><strong>N° Facture:</strong> FAC-{{ payment.id|stringformat:"05d" }}</p>
+            <p><strong>Date:</strong> {{ consultation_date }}</p>
+            <p><strong>Patient:</strong> {{ patient_nom }}</p>
+        </div>
+        <div class="info-box">
+            <h3>Informations Médecin</h3>
+            <p><strong>Dr. {{ medecin_nom }}</strong></p>
+            <p>{{ medecin_email }}</p>
+            <p>{{ medecin_specialite }}</p>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th>Montant</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Téléconsultation médicale</td>
+                <td>{{ montant_total }} DNT</td>
+            </tr>
+            <tr class="total-row">
+                <td><strong>Montant total</strong></td>
+                <td><strong>{{ montant_total }} DNT</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Détail financier</th>
+                <th>Montant</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Montant consultation</td>
+                <td>{{ montant_total }} DNT</td>
+            </tr>
+            <tr>
+                <td>Commission CPharma (15%)</td>
+                <td>- {{ commission }} DNT</td>
+            </tr>
+            <tr class="total-row">
+                <td><strong>Net versé au médecin</strong></td>
+                <td><strong>{{ honoraires_medecin }} DNT</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <p>CPharma - Plateforme de Téléconsultation Médicale</p>
+        <p>Cette facture a été générée automatiquement le {{ generation_date }}</p>
+    </div>
+</body>
+</html>

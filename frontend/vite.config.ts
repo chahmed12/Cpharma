@@ -14,11 +14,16 @@ export default defineConfig({
       // Proxy API vers Django en développement
       '/api': {
         target: 'http://backend:8000',
-        changeOrigin: true,
+        // Pas de changeOrigin pour que Django reçoive 'localhost' comme Host
+        // et construise correctement les URLs absolues des médias.
       },
       '/ws': {
         target: 'ws://backend:8000',
         ws: true,
+      },
+      // Proxy pour les fichiers médias uploadés (ex: photos des docteurs)
+      '/media': {
+        target: 'http://backend:8000',
       },
     },
   },

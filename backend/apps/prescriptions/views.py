@@ -88,12 +88,8 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         Reçoit l'ordonnance, vérifie la signature PKI et enregistre.
         Le sha256_hash est recalculé côté backend à partir du PDF uploadé.
         """
-        logger.info("=== PRESCRIPTION CREATE DEBUG ===")
-        logger.info("Keys: %s", list(request.data.keys()))
-
         raw_ordonnance = request.data.get("ordonnance_data")
         if not raw_ordonnance:
-            logger.warning("FAIL: missing ordonnance_data")
             return Response(
                 {"detail": "ordonnance_data requis."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -102,13 +98,11 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         try:
             ordonnance_data = json.loads(raw_ordonnance)
         except (json.JSONDecodeError, TypeError):
-            logger.warning("FAIL: invalid JSON")
             return Response(
                 {"detail": "JSON invalide."}, status=status.HTTP_400_BAD_REQUEST
             )
 
         if not isinstance(ordonnance_data, dict):
-            logger.warning("FAIL: not a dict")
             return Response(
                 {"detail": "ordonnance_data doit être un objet JSON."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -117,11 +111,6 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         signature = request.data.get("signature")
         client_hash = request.data.get("sha256_hash")
         pdf_file = request.FILES.get("pdf")
-
-        logger.info("ordonnance_data: %s", json.dumps(ordonnance_data, indent=2))
-        logger.info("signature present: %s", signature is not None)
-        logger.info("client_hash: %s", client_hash)
-        logger.info("pdf_file: %s", pdf_file)
 
         # ── 0. Validation du fichier PDF (SEC-03) ─────────────────────────────
         if pdf_file:
@@ -141,16 +130,13 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
                 )
             pdf_file.seek(0)
 
-        # ── 1. Vérification du hash PDF (FIX critique) ────────────────────────
+        # ── 1. Vérification du hash PDF ───────────────────────────────────────
         if pdf_file:
             pdf_bytes = pdf_file.read()
             computed_hash = hashlib.sha256(pdf_bytes).hexdigest()
-            pdf_file.seek(0)  # Rembobiner pour le save ultérieur
-            logger.info("computed_hash: %s", computed_hash)
-            logger.info("client_hash: %s", client_hash)
+            pdf_file.seek(0)
 
             if computed_hash != client_hash:
-                logger.warning("FAIL: Hash mismatch")
                 return Response(
                     {
                         "detail": "Hash PDF incohérent. Le document a peut-être été altéré."
@@ -158,18 +144,20 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        sha256_hash = client_hash  # Validé ci-dessus
+        sha256_hash = client_hash
 
         # ── 2. Vérification de la clé publique ───────────────────────────────
         medecin = request.user
-        logger.info("medecin: %s", medecin)
+
+        if not hasattr(medecin, "doctorprofile") or not medecin.doctorprofile:
+            return Response(
+                {"detail": "Profil médecin introuvable."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         public_key_b64 = medecin.doctorprofile.public_key
-        logger.info(
-            "public_key_b64 length: %s", len(public_key_b64) if public_key_b64 else 0
-        )
 
         if not public_key_b64:
-            logger.warning("FAIL: No public key")
             return Response(
                 {
                     "detail": "Clé publique PKI absente. Veuillez vous reconnecter pour générer vos clés."
@@ -180,9 +168,10 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         # ── 3. Vérification PKI (non-répudiation) ────────────────────────────
         try:
             is_valid = verify_rsa_signature(public_key_b64, signature, ordonnance_data)
-            logger.info("PKI is_valid: %s", is_valid)
         except Exception as e:
-            logger.error("PKI exception: %s", e)
+            logger.error(
+                "Erreur technique lors de la vérification de la signature : %s", e
+            )
             return Response(
                 {
                     "detail": "Erreur technique lors de la vérification de la signature. Réessayez."
@@ -191,7 +180,6 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
             )
 
         if not is_valid:
-            logger.warning("FAIL: Invalid signature")
             return Response(
                 {
                     "detail": "Signature RSA-PSS invalide. Ordonnance rejetée pour non-conformité."
@@ -236,6 +224,12 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if Prescription.objects.filter(consultation=consultation).exists():
+            return Response(
+                {"detail": "Une ordonnance existe déjà pour cette consultation."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # ── 5. Création de la prescription ───────────────────────────────────
         prescription = Prescription.objects.create(
             consultation_id=consultation_id,
@@ -251,6 +245,7 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
             medecin,
             "PRESCRIPTION_CREATED",
             f"Ordonnance #{prescription.id} pour consultation #{consultation_id}",
+            request=request,
         )
 
         # ── 6. Notification WebSocket au pharmacien ───────────────────────────

@@ -3,9 +3,13 @@ import { SocketContext } from '../context/SocketContext';
 
 /**
  * Hook pour s'abonner à un événement WebSocket.
- * Usage : useSocket('new_patient', (data) => setQueue(prev => [...prev, data]));
+ * Usage : useSocketEvent('new_patient', (data) => setQueue(prev => [...prev, data]));
+ * 
+ * @param event - Nom de l'événement WebSocket
+ * @param handler - Callback à exécuter quand l'événement est reçu
+ * @returns Fonctions send et état isConnected
  */
-export function useSocket(
+export function useSocketEvent(
     event: string,
     handler: (data: unknown) => void
 ) {
@@ -24,6 +28,12 @@ export function useSocket(
 
     return { send, isConnected };
 }
+
+/**
+ * Alias pour compatibilité rétroactive.
+ * @deprecated Utiliser useSocketEvent à la place
+ */
+export const useSocket = useSocketEvent;
 
 /**
  * Hook pour accéder uniquement à l'état de connexion WebSocket.

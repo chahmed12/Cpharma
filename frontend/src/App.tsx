@@ -5,6 +5,8 @@ import { ConnectionIndicator } from './components/ui/ConnectionIndicator';
 // Auth
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import DoctorRegister from './pages/auth/DoctorRegister';
+import PharmacistRegister from './pages/auth/PharmacistRegister';
 import RegistrationPending from './pages/auth/RegistrationPending';
 import NotFound from './pages/NotFound';
 
@@ -18,6 +20,8 @@ import ConfirmationFin from './pages/ConfirmationFin';
 
 // Médecin
 import DoctorDashboard from './pages/DoctorDashboard';
+import DoctorProfile from './pages/DoctorProfile';
+import DoctorFinances from './pages/DoctorFinances';
 import VideoCall from './pages/VideoCall';
 import PrescriptionForm from './pages/PrescriptionForm';
 import SignatureOrdonnance from './pages/SignatureOrdonnance';
@@ -37,6 +41,8 @@ export default function App() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/register/doctor" element={<DoctorRegister />} />
+        <Route path="/register/pharmacist" element={<PharmacistRegister />} />
         <Route path="/pending" element={<ProtectedRoute><RegistrationPending /></ProtectedRoute>} />
 
         {/* ── Routes pharmacien ────────────────────── */}
@@ -62,6 +68,12 @@ export default function App() {
         {/* ── Routes médecin ────────────────────────── */}
         <Route path="/doctor/dashboard"
           element={<ProtectedRoute role="MEDECIN"><DoctorDashboard /></ProtectedRoute>}
+        />
+        <Route path="/doctor/profile"
+          element={<ProtectedRoute role="MEDECIN"><DoctorProfile /></ProtectedRoute>}
+        />
+        <Route path="/doctor/finances"
+          element={<ProtectedRoute role="MEDECIN"><DoctorFinances /></ProtectedRoute>}
         />
         <Route path="/doctor/video/:id"
           element={<ProtectedRoute role="MEDECIN"><VideoCall /></ProtectedRoute>}

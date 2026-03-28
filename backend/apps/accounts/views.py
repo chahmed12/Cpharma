@@ -23,7 +23,7 @@ from django.core.mail import send_mail
 
 # ── 3. Django REST Framework ──────────────────────────────────────────────────
 from rest_framework import permissions, status
-from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes, authentication_classes
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 
@@ -38,7 +38,13 @@ from channels.layers import get_channel_layer
 from apps.core.audit import log_action
 from apps.core.permissions import IsVerified
 from .models import DoctorProfile
-from .serializers import DoctorListSerializer, RegisterSerializer, UserSerializer
+from .serializers import (
+    DoctorListSerializer,
+    RegisterSerializer,
+    UserSerializer,
+    DoctorProfileSerializer,
+    DoctorProfileUpdateSerializer,
+)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -114,8 +120,11 @@ def register(request):
             recipient_list=admin_emails,
             fail_silently=True,
         )
-    except Exception:
-        pass  # On ignore silencieusement si le SMTP n'est pas configuré
+    except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning("Échec de l'envoi de l'email admin: %s", str(e))
 
     return Response(
         {
@@ -123,9 +132,6 @@ def register(request):
         },
         status=status.HTTP_201_CREATED,
     )
-
-
-from rest_framework.throttling import AnonRateThrottle
 
 
 class LoginRateThrottle(AnonRateThrottle):
@@ -369,3 +375,202 @@ def update_public_key(request):
 
     log_action(request.user, "KEY_UPDATE", "Mise à jour de la clé publique PKI")
     return Response({"ok": True}, status=status.HTTP_200_OK)
+
+
+@api_view(["GET", "PATCH"])
+@permission_classes([permissions.IsAuthenticated, IsVerified])
+def doctor_profile(request):
+    """GET: retourne le profil du médecin. PATCH: met à jour le profil."""
+    try:
+        profile = request.user.doctorprofile
+    except ObjectDoesNotExist:
+        return Response(
+            {"detail": "Profil médecin introuvable."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if request.method == "GET":
+        serializer = DoctorProfileSerializer(profile, context={"request": request})
+        return Response(serializer.data)
+
+    if request.method == "PATCH":
+        serializer = DoctorProfileUpdateSerializer(
+            profile, data=request.data, partial=True
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                DoctorProfileSerializer(profile, context={"request": request}).data
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  OTP — INSCRIPTION ET RÉINITIALISATION DE MOT DE PASSE
+# ─────────────────────────────────────────────────────────────────────────────
+
+from django.core.cache import cache
+from django.utils.crypto import get_random_string
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([AnonRateThrottle])
+def send_register_otp(request):
+    email = request.data.get("email", "").strip().lower()
+    nom = request.data.get("nom", "Docteur").strip()
+    
+    if not email:
+        return Response({"detail": "L'email est requis."}, status=status.HTTP_400_BAD_REQUEST)
+    if User.objects.filter(email=email).exists():
+        return Response({"detail": "Cet email est déjà utilisé."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    code = get_random_string(length=6, allowed_chars='0123456789')
+    cache.set(f"otp_register_{email}", code, timeout=600)
+    
+    message = f"""Bonjour {nom},
+
+Merci de vous être inscrit sur Cpharma. Pour finaliser votre inscription, veuillez utiliser le code de vérification suivant :
+
+{code[0]} {code[1]} {code[2]} {code[3]} {code[4]} {code[5]}
+Ce code expire dans 10 minutes.
+
+Si vous n'avez pas créé de compte sur Cpharma, ignorez cet email.
+L'équipe Cpharma
+
+contact@cpharma.tn — Ne pas répondre à cet email automatique
+"""
+    try:
+        send_mail(
+            subject="Vérification de votre email - Cpharma",
+            message=message,
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@cpharma.tn"),
+            recipient_list=[email],
+            fail_silently=False,
+        )
+        return Response({"message": "Code envoyé avec succès."})
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Erreur envoi OTP: {e}")
+        return Response({"detail": "Erreur lors de l'envoi de l'email OTP."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([AnonRateThrottle])
+def verify_register_otp(request):
+    email = request.data.get("email", "").strip().lower()
+    code = request.data.get("otp_code", "").strip()
+    
+    cached_code = cache.get(f"otp_register_{email}")
+    if cached_code and cached_code == code:
+        cache.set(f"otp_verified_{email}", True, timeout=3600)
+        cache.delete(f"otp_register_{email}")
+        return Response({"message": "Email vérifié avec succès."})
+    
+    return Response({"detail": "Code invalide ou expiré."}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([AnonRateThrottle])
+def request_password_reset(request):
+    email = request.data.get("email", "").strip().lower()
+    if not email:
+        return Response({"detail": "L'email est requis."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    user = User.objects.filter(email=email).first()
+    if not user:
+        return Response({"message": "Si l'email existe, un code a été envoyé."})
+        
+    code = get_random_string(length=6, allowed_chars='0123456789')
+    cache.set(f"otp_reset_{email}", code, timeout=600)
+    
+    message = f"""Bonjour {user.nom},
+
+Vous avez demandé la réinitialisation de votre mot de passe. Utilisez ce code pour procéder :
+
+{code[0]} {code[1]} {code[2]} {code[3]} {code[4]} {code[5]}
+Ce code expire dans 10 minutes.
+
+Si vous n'avez pas demandé cette réinitialisation, ignorez cet email et sécurisez votre compte.
+L'équipe Cpharma
+
+
+contact@cpharma.tn — Ne pas répondre à cet email automatique
+"""
+    try:
+        send_mail(
+            subject="Réinitialisation de votre mot de passe - Cpharma",
+            message=message,
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@cpharma.tn"),
+            recipient_list=[email],
+            fail_silently=False,
+        )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Erreur envoi OTP password reset: {e}")
+        
+    return Response({"message": "Si l'email existe, un code a été envoyé."})
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([AnonRateThrottle])
+def verify_password_reset(request):
+    """
+    Vérifie le code OTP pour la réinitialisation de mot de passe.
+    """
+    email = request.data.get("email", "").strip().lower()
+    code = request.data.get("otp_code", "").strip()
+    
+    if not email or not code:
+        return Response({"detail": "Email et code OTP requis."}, status=status.HTTP_400_BAD_REQUEST)
+
+    cached_code = cache.get(f"otp_reset_{email}")
+    if cached_code and cached_code == code:
+        # Autorise le changement de mot de passe pendant 15 minutes
+        cache.set(f"otp_reset_verified_{email}", True, timeout=900)
+        cache.delete(f"otp_reset_{email}")
+        return Response({"message": "Code valide. Vous pouvez réinitialiser le mot de passe."})
+    
+    return Response({"detail": "Code invalide ou expiré."}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([permissions.AllowAny])
+@throttle_classes([AnonRateThrottle])
+def confirm_password_reset(request):
+    """
+    Définit le nouveau mot de passe après vérification de l'OTP.
+    """
+    email = request.data.get("email", "").strip().lower()
+    new_password = request.data.get("new_password", "")
+    
+    if not email or not new_password:
+        return Response({"detail": "Email et nouveau mot de passe requis."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    is_verified = cache.get(f"otp_reset_verified_{email}")
+    if not is_verified:
+        return Response({"detail": "Vous devez d'abord valider le code OTP."}, status=status.HTTP_403_FORBIDDEN)
+        
+    user = User.objects.filter(email=email).first()
+    if not user:
+        return Response({"detail": "Utilisateur introuvable."}, status=status.HTTP_404_NOT_FOUND)
+        
+    from django.contrib.auth.password_validation import validate_password
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    try:
+        validate_password(new_password)
+    except DjangoValidationError as exc:
+        return Response({"detail": list(exc.messages)[0]}, status=status.HTTP_400_BAD_REQUEST)
+        
+    user.set_password(new_password)
+    user.save()
+    
+    cache.delete(f"otp_reset_verified_{email}")
+    return Response({"message": "Mot de passe réinitialisé avec succès."})

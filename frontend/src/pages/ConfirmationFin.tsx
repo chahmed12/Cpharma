@@ -23,7 +23,12 @@ export default function ConfirmationFin() {
     useEffect(() => {
         const controller = new AbortController();
         getPaymentByConsultation(Number(id), { signal: controller.signal })
-            .then(setPayment)
+            .then(p => {
+                setPayment(p);
+                if (p.status === 'PAID') {
+                    setConfirmed(true);
+                }
+            })
             .catch(err => {
                 if (err.name === 'CanceledError') return;
                 toast('Impossible de charger les données de paiement.', 'error');

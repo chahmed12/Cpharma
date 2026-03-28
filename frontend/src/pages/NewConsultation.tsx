@@ -93,10 +93,14 @@ export default function NewConsultation() {
 
             navigate(`/pharmacist/waiting/${consultation.id}`);
         } catch (catchErr) {
-            console.error("API Error: ", catchErr);
-            const err = catchErr as { response?: { data?: unknown }, message?: string };
-            const msg = err.response?.data ? JSON.stringify(err.response.data) : err.message;
-            toast("Erreur : " + msg, "error");
+            const err = catchErr as { response?: { data?: { detail?: string } }, message?: string };
+            if (err.response?.data?.detail) {
+                toast(err.response.data.detail, 'error');
+            } else if (err.message) {
+                toast(err.message, 'error');
+            } else {
+                toast('Une erreur est survenue. Veuillez réessayer.', 'error');
+            }
         } finally {
             setLoading(false);
         }

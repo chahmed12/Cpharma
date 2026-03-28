@@ -8,7 +8,8 @@ import { pdf } from '@react-pdf/renderer';
 import { OrdonnancePDF } from '../components/prescription/OrdonnancePDF';
 import api from '../services/api';
 import { KeyRound, CheckCircle2, Lock, CheckCircle, AlertOctagon } from 'lucide-react';
-import type { OrdonnanceData } from './PrescriptionForm';
+import type { OrdonnanceData } from '../types/prescription';
+import { getConsultation } from '../services/consultationService';
 
 interface SignaturePageState {
     consultation_id: number;
@@ -49,6 +50,23 @@ export default function SignatureOrdonnance() {
             setDataLoaded(true);
         }
     }, [location.state, navigate, dataLoaded]);
+
+    useEffect(() => {
+        if (!data?.consultation_id) return;
+        const controller = new AbortController();
+        (async () => {
+            try {
+                const c = await getConsultation(data.consultation_id, { signal: controller.signal });
+                if (c.status === 'CANCELLED') {
+                    sessionStorage.removeItem(PENDING_KEY);
+                    navigate('/doctor/dashboard', { replace: true });
+                }
+            } catch {
+                // ignore
+            }
+        })();
+        return () => controller.abort();
+    }, [data, navigate]);
 
     useEffect(() => {
         if (status === 'done') {

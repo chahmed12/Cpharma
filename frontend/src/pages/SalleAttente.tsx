@@ -9,6 +9,23 @@ export default function SalleAttente() {
     const consultationId = id ? Number(id) : null;
     const [dots, setDots] = useState('');
 
+    useEffect(() => {
+        if (!consultationId) return;
+        const controller = new AbortController();
+        (async () => {
+            try {
+                const { getConsultation } = await import('../services/consultationService');
+                const c = await getConsultation(consultationId, { signal: controller.signal });
+                if (c.status === 'COMPLETED' || c.status === 'CANCELLED') {
+                    navigate('/pharmacist/dashboard', { replace: true });
+                }
+            } catch {
+                // ignore
+            }
+        })();
+        return () => controller.abort();
+    }, [consultationId, navigate]);
+
     // FIX : hasNavigated en ref booléenne — mis à true de façon synchrone
     // avant tout appel à navigate() pour empêcher toute double navigation,
     // même si le WebSocket et le polling se déclenchent dans le même tick JS.

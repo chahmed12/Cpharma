@@ -1,8 +1,17 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
+interface ChatMessage {
+    id?: number;
+    sender_id: number;
+    sender_name: string;
+    content: string;
+    timestamp: string;
+}
+
 interface UseWebRTCOptions {
     consultationId: number;
     isCaller: boolean;
+    onChatMessage?: (msg: ChatMessage) => void;
 }
 
 const ICE_SERVERS = {
@@ -17,12 +26,14 @@ const ICE_SERVERS = {
     ],
 };
 
-export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
+export function useWebRTC({ consultationId, isCaller, onChatMessage }: UseWebRTCOptions) {
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
+    const onChatMessageRef = useRef(onChatMessage);
+    onChatMessageRef.current = onChatMessage;
 
     // FIX : pingInterval exposé en ref pour pouvoir le stopper depuis hangUp
     const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -86,7 +97,15 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
         }, 1500);
 
         ws.onmessage = async (event) => {
-            const { type, data } = JSON.parse(event.data);
+            let msg: { type: string; data?: unknown };
+            try {
+                msg = JSON.parse(event.data);
+            } catch {
+                console.error('Message WebSocket invalide:', event.data);
+                return;
+            }
+
+            const { type, data } = msg;
 
             if (type === 'ping') {
                 ws.send(JSON.stringify({ type: 'pong' }));
@@ -97,7 +116,7 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
                 maybeStartCall();
             } else if (type === 'offer') {
                 try {
-                    await pc.setRemoteDescription(new RTCSessionDescription(data));
+                    await pc.setRemoteDescription(new RTCSessionDescription(data as RTCSessionDescriptionInit));
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
                     ws.send(JSON.stringify({ type: 'answer', data: answer }));
@@ -106,19 +125,21 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
                 }
             } else if (type === 'answer') {
                 try {
-                    await pc.setRemoteDescription(new RTCSessionDescription(data));
+                    await pc.setRemoteDescription(new RTCSessionDescription(data as RTCSessionDescriptionInit));
                 } catch (e) {
                     console.error("Error handling answer:", e);
                 }
             } else if (type === 'ice') {
                 try {
-                    await pc.addIceCandidate(new RTCIceCandidate(data));
+                    await pc.addIceCandidate(new RTCIceCandidate(data as RTCIceCandidateInit));
                 } catch (e) {
                     console.error("Error adding ice candidate:", e);
                 }
             } else if (type === 'hangup') {
                 pc.close();
                 setConnectionState('disconnected');
+            } else if (type === 'chat' && typeof data === 'object' && data !== null) {
+                onChatMessageRef.current?.(data as { sender_id: number; sender_name: string; content: string; timestamp: string });
             }
         };
 
@@ -198,8 +219,14 @@ export function useWebRTC({ consultationId, isCaller }: UseWebRTCOptions) {
         localStreamRef.current?.getTracks().forEach(t => t.stop());
     }, []);
 
+    const sendChatMessage = useCallback((content: string) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'chat', content }));
+        }
+    }, []);
+
     return {
         localVideoRef, remoteVideoRef, connectionState,
-        isMicOn, isCamOn, toggleMic, toggleCam, hangUp,
+        isMicOn, isCamOn, toggleMic, toggleCam, hangUp, sendChatMessage,
     };
 }
