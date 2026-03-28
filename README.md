@@ -36,11 +36,17 @@ L'architecture robuste et "Production-Ready" est le fruit d'une ingénierie avan
 - **Rédaction & Signature** : Ordonnancier intelligent couplé au système de cryptographie local.
 
 ### 🔐 Architecture de Sécurité Inviolable (Module PKI & API)
+- **Traçabilité Juridique Forte** : Enregistrement immuable des consentements légaux (CGU, Contrats, Confidentialité) avec estampillage de l'adresse IP et de la version exacte du document lors de l'onboarding.
+- **Protection Anti-Abus & PAM (OTP)** : Sécurisation absolue des flux de récupération de mot de passe et d'inscriptions par des limites de requêtes (Rate Throttling) dynamiques sur les codes à usage unique.
 - **Algorithme RSA-PSS / SHA-256** : Génération des paires de clés asymétriques directement dans le navigateur du médecin (`IndexedDB`) via l'API WebCrypto.
 - **Sérialisation Canonique** : L'empreinte JSON est structurée récursivement en _UTF-8 strict_ entre JS et Python pour assurer une vérification millimétrée au byte près. Aucune altération n'est tolérée par le Backend.
 - **Vérification Pharmacien Anti-MITM** : Le certificat de l'ordonnance est re-vérifié cryptographiquement *par le navigateur du point de vente*, garantissant qu'aucun réseau ou hacker local n'a falsifié le statut `is_valid`.
 - **Protection API & Session Stricte** : Authentification par JWT stockés exclusivement en **Cookies HttpOnly** (immunité totale contre les XSS). Sécurisation renforcée des endpoints par un Guard `IsVerified` obligeant la validation manuelle des professionnels par un administrateur.
 - **Durcissement Nginx & Docker** : Politique CSP stricte sans exécution inline, headers anti-sniffing et clickjacking bloqués, et isolation complète des volumes de logs (Audit).
+
+### 📝 Onboarding & Hub d'Authentification
+- **Inscription Multi-Profils** : Parcours d'intégration sur-mesure (Médecins et Pharmacres) en 5 étapes avec validation d'email par OTP et upload sécurisé des pièces justificatives (CIN, Patente, CNOM, Autorisations).
+- **Interface de Connexion Dynamique** : Hub d'authentification unifiée avec sélecteur de rôle et tunnel de récupération de compte intégré à 3 étapes.
 
 ### 💊 Environnement Pharmacien (Facturation & Point de Vente)
 - **Délivrance Numérique** : Validation rapide des identifiants d'ordonnances (Hash). Une fois les médicaments distribués, l'ordonnance est marquée stricte avec `is_dispensed=True` pour bloquer la sur-délivrance.
