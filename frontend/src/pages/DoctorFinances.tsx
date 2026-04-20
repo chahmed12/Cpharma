@@ -101,17 +101,6 @@ export default function DoctorFinances() {
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Montant total des consultations</p>
                     </div>
 
-                    <div className="card animate-fade-up delay-2" style={{ padding: '24px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px', color: 'var(--orange-600)' }}>
-                            <FileText size={20} />
-                            <span style={{ fontSize: '12px', textTransform: 'uppercase', fontWeight: '600' }}>Commission CPharma</span>
-                        </div>
-                        <p style={{ fontSize: '32px', fontWeight: '800', color: 'var(--orange-700)', margin: 0 }}>
-                            {commission.toFixed(2)} <span style={{ fontSize: '16px', fontWeight: '400' }}>DNT</span>
-                        </p>
-                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{tauxCommission}% des honoraires</p>
-                    </div>
-
                     <div className="card animate-fade-up delay-3" style={{ padding: '24px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px', color: 'var(--purple-600)' }}>
                             <Calendar size={20} />

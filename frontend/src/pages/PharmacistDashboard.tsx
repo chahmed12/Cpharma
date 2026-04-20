@@ -361,8 +361,11 @@ export default function PharmacistDashboard() {
                                                 </p>
                                             </div>
                                             <div style={{ textAlign: 'right' }}>
-                                                <p style={{ fontWeight: '700', fontSize: '15px', color: 'var(--green-700)' }}>
-                                                    {p.montant_total} DNT
+                                                <p style={{ fontWeight: '700', fontSize: '15px', color: 'var(--green-700)', marginBottom: '2px' }}>
+                                                    +{parseFloat(p.commission).toFixed(2)} DNT <span style={{ fontSize: '12px', fontWeight: '400', color: 'var(--text-muted)' }}>(Commission)</span>
+                                                </p>
+                                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                                    Total encaissé : {p.montant_total} DNT
                                                 </p>
                                                 <button
                                                     onClick={() => downloadInvoice(p.id)}

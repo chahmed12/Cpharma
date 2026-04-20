@@ -11,6 +11,17 @@ class PatientViewSet(viewsets.ModelViewSet):
     serializer_class = PatientSerializer
     permission_classes = [permissions.IsAuthenticated, IsVerified]
 
+    def create(self, request, *args, **kwargs):
+        telephone = request.data.get('telephone')
+        if telephone:
+            existing_patient = Patient.objects.filter(telephone=telephone).first()
+            if existing_patient:
+                # Si le patient existe déjà, le renvoyer plutôt que lever une erreur d'unicité
+                # Ceci permet au pharmacien de continuer avec ce patient
+                serializer = self.get_serializer(existing_patient)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+        return super().create(request, *args, **kwargs)
+
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "destroy"):
             if self.request.user.role != "PHARMACIEN":

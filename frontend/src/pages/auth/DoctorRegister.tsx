@@ -133,8 +133,8 @@ export default function DoctorRegister() {
         if (form.password !== form.passwordConfirm) {
             toast('Les mots de passe ne correspondent pas.', 'error'); return;
         }
-        if (!/^(?=.*\d).{8,}$/.test(form.password)) {
-            toast('Mot de passe : minimum 8 caractères dont 1 chiffre.', 'error'); return;
+        if (!/^(?=.*\d).{10,}$/.test(form.password)) {
+            toast('Mot de passe : minimum 10 caractères dont 1 chiffre.', 'error'); return;
         }
         setLoading(true);
         try {

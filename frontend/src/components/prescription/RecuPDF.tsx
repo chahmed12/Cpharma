@@ -68,7 +68,7 @@ export function RecuPDF({ payment }: { payment: Payment }) {
                     <Text style={S.value}>{payment.montant_total} DNT</Text>
                 </View>
                 <View style={S.row}>
-                    <Text style={S.label}>Commission plateforme (10%)</Text>
+                    <Text style={S.label}>Commission Pharmacie (15%)</Text>
                     {/* Correction ici ↓ */}
                     <Text style={[S.value, { color: '#ef4444' }]}>- {payment.commission} DNT</Text>
                 </View>

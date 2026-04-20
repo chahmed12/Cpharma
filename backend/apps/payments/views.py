@@ -1,16 +1,80 @@
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.db.models import Sum
 from django.utils import timezone
 from django.http import HttpResponse
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
-from apps.core.permissions import IsVerified
-from .models import Payment
+from rest_framework.views import APIView
+from apps.core.permissions import IsVerified, IsSubscribed
+from .models import Payment, Subscription
 from .serializers import PaymentSerializer
 from apps.core.audit import log_action
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  ABONNEMENTS — Statut & Simulation de paiement
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class SubscriptionView(APIView):
+    """
+    Endpoints de gestion de l'abonnement (version prototype — sans gateway).
+
+    GET  /api/subscriptions/        → statut de l'abonnement de l'utilisateur connecté
+    POST /api/subscriptions/simulate-pay/ → ajoute 30 jours à end_date (simulation)
+    """
+    permission_classes = [permissions.IsAuthenticated, IsVerified]
+
+    def get(self, request):
+        """Retourne le statut de l'abonnement de l'utilisateur connecté."""
+        try:
+            sub = request.user.subscription
+            return Response({
+                "end_date": sub.end_date,
+                "is_active": sub.is_active(),
+                "days_remaining": (sub.end_date - timezone.now().date()).days,
+            })
+        except Subscription.DoesNotExist:
+            return Response(
+                {"detail": "Aucun abonnement trouvé pour cet utilisateur."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    def post(self, request):
+        """
+        Simule un paiement d'abonnement en ajoutant 30 jours à end_date.
+        Crée l'abonnement s'il n'existe pas encore.
+        Réservé aux médecins et pharmaciens uniquement.
+        """
+        if request.user.role not in ("MEDECIN", "PHARMACIEN"):
+            return Response(
+                {"detail": "Seuls les professionnels de santé peuvent souscrire à un abonnement."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        sub, created = Subscription.objects.get_or_create(
+            user=request.user,
+            defaults={"end_date": timezone.now().date()},
+        )
+        sub.extend(days=30)
+
+        log_action(
+            request.user,
+            "OTHER",
+            f"Abonnement simulé — nouvelle date d'expiration : {sub.end_date}",
+            request=request,
+        )
+
+        return Response({
+            "message": "Abonnement renouvelé avec succès (+30 jours).",
+            "end_date": sub.end_date,
+            "is_active": sub.is_active(),
+            "days_remaining": (sub.end_date - timezone.now().date()).days,
+        }, status=status.HTTP_200_OK)
+
 
 
 class PaymentViewSet(viewsets.ReadOnlyModelViewSet):

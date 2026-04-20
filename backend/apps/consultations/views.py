@@ -83,7 +83,7 @@ class ConsultationViewSet(viewsets.ModelViewSet):
         new_status = request.data.get("status")
 
         if user.id not in (consultation.medecin_id, consultation.pharmacien_id):
-            return Response({"error": "Non autorisé"}, status=status.HTTP_403_FORBIDDEN)
+            return Response({"detail": "Non autorisé"}, status=status.HTTP_403_FORBIDDEN)
 
         VALID_TRANSITIONS = {
             "PENDING": ["ACTIVE", "CANCELLED"],
@@ -91,13 +91,13 @@ class ConsultationViewSet(viewsets.ModelViewSet):
         }
         if new_status not in VALID_TRANSITIONS.get(consultation.status, []):
             return Response(
-                {"error": "Transition non autorisée"},
+                {"detail": "Transition non autorisée"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         if new_status not in dict(Consultation.Status.choices):
             return Response(
-                {"error": "Statut invalide"}, status=status.HTTP_400_BAD_REQUEST
+                {"detail": "Statut invalide"}, status=status.HTTP_400_BAD_REQUEST
             )
         from django.db import transaction
 

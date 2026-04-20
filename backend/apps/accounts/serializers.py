@@ -10,6 +10,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from .models import CustomUser, DoctorProfile, PharmacistProfile
+from .services.otp_service import OTPService
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -66,6 +67,9 @@ class RegisterSerializer(serializers.ModelSerializer):
             "matricule_fiscal",
             "document_autorisation",
             "document_patente",
+            "cgu_version",
+            "contrat_version",
+            "confidentialite_version",
         ]
 
     # ── Validateurs champ par champ ───────────────────────────────────────────
@@ -73,11 +77,22 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate(self, data):
         # Vérifier que l'email a été validé par OTP
         email = data.get("email", "").strip().lower()
-        if email:
-            from django.core.cache import cache
-            is_verified = cache.get(f"otp_verified_{email}")
-            if not is_verified:
-                raise serializers.ValidationError({"email": "L'adresse email n'a pas été vérifiée par OTP."})
+        if email and not OTPService.is_verified(email, "register"):
+            raise serializers.ValidationError(
+                {"email": "L'adresse email n'a pas été vérifiée par OTP."}
+            )
+                
+        # Vérifications spécifiques au rôle Pharmacien
+        role = data.get("role", "")
+        if role == CustomUser.Role.PHARMACIEN:
+            required_pharma = ["cin_numero", "numero_autorisation", "nom_pharmacie", "gouvernorat", "adresse", "matricule_fiscal"]
+            errors = {}
+            for field in required_pharma:
+                if not data.get(field):
+                    errors[field] = "Ce champ est obligatoire pour les pharmaciens."
+            if errors:
+                raise serializers.ValidationError(errors)
+
         return data
 
     def validate_image(self, value):
@@ -193,9 +208,8 @@ class RegisterSerializer(serializers.ModelSerializer):
                 document_patente=document_patente,
             )
             
-        # Clear out the OTP verification state to prevent reuse
-        from django.core.cache import cache
-        cache.delete(f"otp_verified_{user.email}")
+        # Nettoyage du flag OTP après inscription réussie (empêche la réutilisation)
+        OTPService.clear_verified(user.email, "register")
 
         return user
 

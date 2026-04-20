@@ -54,6 +54,14 @@ export default function Login() {
         setLoading(true);
         try {
             const u = await login(email, password);
+            if (u.role !== loginRole) {
+                // If they logged into the wrong portal, invalidate their local session immediately.
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                toast(`Accès refusé. Veuillez vous connecter dans l'espace ${u.role === 'PHARMACIEN' ? 'Pharmacie' : 'Médecin'}.`, 'error');
+                return;
+            }
+            
             if (!u.is_verified) {
                 navigate('/pending', { replace: true });
             } else {

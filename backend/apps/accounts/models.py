@@ -3,6 +3,20 @@ from django.db import models
 from decimal import Decimal
 
 
+class BaseProfile(models.Model):
+    """
+    Socle commun aux profils médecin et pharmacien.
+    Regroupe les champs d'identité partagés pour éviter la duplication.
+    Ce modèle est abstrait : il ne génère aucune table propre en base.
+    """
+
+    cin_numero = models.CharField(max_length=8, blank=True)
+    gouvernorat = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        abstract = True
+
+
 class CustomUser(AbstractUser):
     class Role(models.TextChoices):
         MEDECIN = "MEDECIN", "Médecin"
@@ -49,7 +63,12 @@ class LegalAcceptance(models.Model):
         return f"{self.user.email} - {self.document_type} (v{self.version})"
 
 
-class DoctorProfile(models.Model):
+class DoctorProfile(BaseProfile):
+    """
+    Profil spécifique aux médecins.
+    Hérite de BaseProfile : cin_numero, gouvernorat.
+    """
+
     class Status(models.TextChoices):
         OFFLINE = "OFFLINE", "Hors ligne"
         ONLINE = "ONLINE", "En ligne"
@@ -58,8 +77,7 @@ class DoctorProfile(models.Model):
     user = models.OneToOneField(
         CustomUser, on_delete=models.CASCADE, related_name="doctorprofile"
     )
-    cin_numero = models.CharField(max_length=8, blank=True)
-    gouvernorat = models.CharField(max_length=100, blank=True)
+    # document_cin spécifique médecin (upload_to différent de PharmacistProfile)
     document_cin = models.FileField(upload_to="doctors/documents/cin/", null=True, blank=True)
     document_cnom = models.FileField(upload_to="doctors/documents/cnom/", null=True, blank=True)
     specialite = models.CharField(max_length=100, blank=True)
@@ -77,7 +95,12 @@ class DoctorProfile(models.Model):
         return f"Dr. {self.user.nom}"
 
 
-class PharmacistProfile(models.Model):
+class PharmacistProfile(BaseProfile):
+    """
+    Profil spécifique aux pharmaciens.
+    Hérite de BaseProfile : cin_numero, gouvernorat.
+    """
+
     user = models.OneToOneField(
         CustomUser, on_delete=models.CASCADE, related_name="pharmacistprofile"
     )
@@ -86,10 +109,9 @@ class PharmacistProfile(models.Model):
     photo_pharmacie = models.ImageField(
         upload_to="pharmacies/photos/", null=True, blank=True
     )
-    cin_numero = models.CharField(max_length=8, blank=True)
     numero_autorisation = models.CharField(max_length=100, blank=True)
-    gouvernorat = models.CharField(max_length=100, blank=True)
     matricule_fiscal = models.CharField(max_length=100, blank=True)
+    # document_cin spécifique pharmacie (upload_to différent de DoctorProfile)
     document_cin = models.FileField(upload_to="pharmacies/documents/cin/", null=True, blank=True)
     document_autorisation = models.FileField(upload_to="pharmacies/documents/autorisation/", null=True, blank=True)
     document_patente = models.FileField(upload_to="pharmacies/documents/patente/", null=True, blank=True)

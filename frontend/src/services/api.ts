@@ -24,9 +24,9 @@ api.interceptors.response.use(
                 await axios.post(`${getBaseUrl()}/auth/token/refresh/`, {}, { withCredentials: true });
                 return api(original);
             } catch (refreshError) {
+                // Les cookies HttpOnly ne peuvent PAS être supprimés par JS.
+                // Le backend les supprime via POST /auth/logout/ (appelé depuis AuthContext).
                 localStorage.removeItem('user');
-                document.cookie = 'access_token=; Max-Age=0; path=/';
-                document.cookie = 'refresh_token=; Max-Age=0; path=/';
 
                 if (window.location.pathname !== '/login') {
                     window.location.href = '/login';

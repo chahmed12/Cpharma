@@ -55,8 +55,11 @@ def _make_user(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+from unittest.mock import patch
+
 class RegisterTests(APITestCase):
-    def test_register_pharmacien_success(self):
+    @patch('apps.accounts.services.otp_service.OTPService.is_verified', return_value=True)
+    def test_register_pharmacien_success(self, mock_is_verified):
         """Une inscription PHARMACIEN valide retourne 201 et crée l'entrée en base."""
         payload = {
             "email": "pharmacien@test.com",
@@ -64,10 +67,16 @@ class RegisterTests(APITestCase):
             "nom": "Doe",
             "prenom": "John",
             "role": "PHARMACIEN",
+            "cin_numero": "12345678",
+            "numero_autorisation": "AUTH123",
+            "nom_pharmacie": "Pharma Centrale",
+            "gouvernorat": "Tunis",
+            "adresse": "123 Rue",
+            "matricule_fiscal": "MF1234"
         }
         res = self.client.post(REGISTER_URL, payload, format="json")
 
-        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
         self.assertTrue(User.objects.filter(email="pharmacien@test.com").exists())
 
         user = User.objects.get(email="pharmacien@test.com")
@@ -75,7 +84,8 @@ class RegisterTests(APITestCase):
             user.is_verified, "Le compte doit être non-vérifié à la création."
         )
 
-    def test_register_medecin_success(self):
+    @patch('apps.accounts.services.otp_service.OTPService.is_verified', return_value=True)
+    def test_register_medecin_success(self, mock_is_verified):
         """Une inscription MEDECIN valide retourne 201 et crée un DoctorProfile."""
         from apps.accounts.models import DoctorProfile
 
@@ -90,7 +100,7 @@ class RegisterTests(APITestCase):
         }
         res = self.client.post(REGISTER_URL, payload, format="json")
 
-        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
         user = User.objects.get(email="medecin@test.com")
         self.assertTrue(DoctorProfile.objects.filter(user=user).exists())
 
@@ -118,7 +128,8 @@ class RegisterTests(APITestCase):
         res = self.client.post(REGISTER_URL, payload, format="json")
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_register_duplicate_email(self):
+    @patch('apps.accounts.services.otp_service.OTPService.is_verified', return_value=True)
+    def test_register_duplicate_email(self, mock_is_verified):
         """Deux inscriptions avec le même email doivent retourner 400."""
         _make_user(email="duplicate@test.com")
         payload = {

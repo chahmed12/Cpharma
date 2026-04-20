@@ -92,8 +92,8 @@ class WebRTCConsumer(AsyncWebsocketConsumer):
     """
 
     async def connect(self):
-        user = self.scope["user"]
-        if user.is_anonymous:
+        self.user = self.scope["user"]
+        if self.user.is_anonymous:
             await self.close()
             return
 
@@ -107,7 +107,7 @@ class WebRTCConsumer(AsyncWebsocketConsumer):
             consult = await database_sync_to_async(Consultation.objects.get)(
                 pk=self.consultation_id
             )
-            if user.id not in (consult.medecin_id, consult.pharmacien_id):
+            if self.user.id not in (consult.medecin_id, consult.pharmacien_id):
                 await self.close()
                 return
         except Consultation.DoesNotExist:
@@ -143,10 +143,12 @@ class WebRTCConsumer(AsyncWebsocketConsumer):
                     "type": "chat_message",
                     "payload": {
                         "type": "chat",
-                        "sender_id": self.user.id,
-                        "sender_name": f"{self.user.prenom} {self.user.nom}",
-                        "content": content,
-                        "timestamp": saved_msg["timestamp"],
+                        "data": {
+                            "sender_id": self.user.id,
+                            "sender_name": f"{self.user.prenom} {self.user.nom}",
+                            "content": content,
+                            "timestamp": saved_msg["timestamp"],
+                        }
                     },
                     "sender_channel_name": self.channel_name,
                 },
