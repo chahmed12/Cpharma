@@ -44,8 +44,6 @@ export default function DoctorFinances() {
 
     const totalBrut = parseFloat(revenues?.total_brut || '0');
     const totalNet = parseFloat(revenues?.total_net || '0');
-    const commission = totalBrut - totalNet;
-    const tauxCommission = totalBrut > 0 ? (commission / totalBrut * 100).toFixed(1) : '15';
 
     return (
         <div style={{ minHeight: '100vh', background: 'var(--bg-page)' }}>
